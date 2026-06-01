@@ -416,6 +416,25 @@
         </div>
       </div>
 
+      <div class="sec-title">Yedekleme</div>
+      <div style="background:var(--white);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow)">
+        <div style="font-size:12px;color:var(--gray);margin-bottom:12px">Tüm veriler (kovanlar, takvim, kayıtlar, gruplar, tipler) JSON ve Excel olarak indirilir. Geri yüklemek için JSON dosyasını yükleyin.</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <button onclick="yedekAl()"
+            style="width:100%;padding:11px;background:var(--amber);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">
+            📦 Yedek Al (JSON)
+          </button>
+          <button onclick="yedekAlExcel()"
+            style="width:100%;padding:11px;background:var(--green2);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">
+            📊 Yedek Al (Excel)
+          </button>
+          <label style="width:100%;padding:11px;background:var(--white);border:1.5px solid var(--gray2);border-radius:10px;font-size:14px;cursor:pointer;text-align:center;color:var(--brown2);font-family:inherit;font-weight:400;display:block">
+            📂 Yedekten Geri Yükle (JSON)
+            <input type="file" id="yedek-input" accept=".json" style="display:none" onchange="yedekYukle(event)">
+          </label>
+        </div>
+      </div>
+
       <div class="sec-title">Hesap</div>
       <div style="background:var(--white);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow)">
         <div style="font-size:13px;color:var(--gray);margin-bottom:12px" id="settings-email">—</div>
@@ -2143,6 +2162,138 @@ window.addEventListener("popstate", function() {
   }
 });
 
+
+// ─── YEDEKLEME ───────────────────────────────────────────────────
+async function yedekAl() {
+  const veri = {
+    tarih: new Date().toISOString(),
+    versiyon: "1.0",
+    kovanllar: hives,
+    takvim: schedules,
+    kayitlar: records,
+    kovan_gecmis: kovanGecmis,
+    gruplar: getGruplar(),
+    tipler: getTipler(),
+    bannedNumbers: getBannedNumbers(),
+  };
+  const blob = new Blob([JSON.stringify(veri, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `dr-arici-yedek-${new Date().toISOString().split("T")[0]}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast("✓ JSON yedek indirildi");
+}
+
+async function yedekAlExcel() {
+  if (typeof XLSX === "undefined") {
+    // XLSX yok, dinamik yükle
+    showToast("⏳ Excel kütüphanesi yükleniyor...");
+    await new Promise((res, rej) => {
+      const s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+      s.onload = res; s.onerror = rej;
+      document.head.appendChild(s);
+    });
+  }
+  const wb = XLSX.utils.book_new();
+  const tarih = new Date().toISOString().split("T")[0];
+
+  // Kovanlar
+  const kovSatir = [["No","Tip","Lokasyon","Grup","Kraliçe Yılı","Irk","Koloni Gücü","Kat","Toplam Çıta","Bal (kg)","Köken","Not"]];
+  hives.forEach(h => {
+    const grup = getGruplar().find(g => g.id === h.group);
+    const frames = Array.isArray(h.frames) ? h.frames.reduce((a,b)=>a+b,0) : (h.frames||0);
+    const koken = hives.find(x => x.id === h.originHiveId);
+    kovSatir.push([h.name, h.type||"", h.location||"", grup?.ad||"", h.queen||"", h.breed||"", h.strength||"", h.floors||1, frames, h.honey||0, koken?.name||"", h.notes||""]);
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(kovSatir), "Kovanlar");
+
+  // Takvim
+  const takSatir = [["Kovan No","Tür","İlaç/Ürün","Tarih","Not","Tamamlandı"]];
+  schedules.forEach(s => {
+    const hive = hives.find(h => h.id === s.hiveId);
+    takSatir.push([hive?.name||"?", s.type||"", s.drug||"", s.date||"", s.note||"", s.done?"Evet":"Hayır"]);
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(takSatir), "Takvim");
+
+  // Kayıtlar
+  const kaySatir = [["Kovan No","Tarih","Not","Kışlatma","Köken Kovan"]];
+  records.forEach(r => {
+    const hive = hives.find(h => h.id === r.hiveId);
+    const origin = hives.find(h => h.id === r.originHiveId);
+    kaySatir.push([hive?.name||"?", r.date||"", r.note||"", r.winter||"", origin?.name||""]);
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(kaySatir), "Kayıtlar");
+
+  // Geçmiş
+  const gecSatir = [["Kovan No","Durum","Tarih","Not"]];
+  kovanGecmis.forEach(k => {
+    gecSatir.push([k.name||"?", k.arsivDurum||"", k.arsivTarih||"", k.arsivNot||""]);
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(gecSatir), "Geçmiş");
+
+  XLSX.writeFile(wb, `dr-arici-yedek-${tarih}.xlsx`);
+  showToast("✓ Excel yedek indirildi");
+}
+
+async function yedekYukle(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  if (!confirm("⚠️ DİKKAT!\n\nMevcut tüm veriler bu yedekle değiştirilecek!\n\nEmin misiniz?")) {
+    event.target.value = "";
+    return;
+  }
+  try {
+    const text = await file.text();
+    const veri = JSON.parse(text);
+    if (!veri.kovanllar || !veri.versiyon) { showToast("⚠️ Geçersiz yedek dosyası!"); return; }
+
+    // Firestore'a yaz
+    const batch = [];
+
+    // Kovanları sil ve yeniden yaz
+    const kovSnap = await getDocs(col("kovanllar"));
+    kovSnap.docs.forEach(d => batch.push(deleteDoc(doc(db, `users/${currentUser.uid}/kovanllar/${d.id}`))));
+    await Promise.all(batch);
+
+    const batch2 = veri.kovanllar.map(h => {
+      const { id, ...data } = h;
+      return setDoc(doc(db, `users/${currentUser.uid}/kovanllar/${id}`), data);
+    });
+
+    // Takvim
+    const takSnap = await getDocs(col("takvim"));
+    takSnap.docs.forEach(d => batch2.push(deleteDoc(doc(db, `users/${currentUser.uid}/takvim/${d.id}`))));
+    veri.takvim?.forEach(s => { const { id, ...data } = s; batch2.push(setDoc(doc(db, `users/${currentUser.uid}/takvim/${id}`), data)); });
+
+    // Kayıtlar
+    const kaySnap = await getDocs(col("kayitlar"));
+    kaySnap.docs.forEach(d => batch2.push(deleteDoc(doc(db, `users/${currentUser.uid}/kayitlar/${d.id}`))));
+    veri.kayitlar?.forEach(r => { const { id, ...data } = r; batch2.push(setDoc(doc(db, `users/${currentUser.uid}/kayitlar/${id}`), data)); });
+
+    // Geçmiş
+    const gecSnap = await getDocs(col("kovan_gecmis"));
+    gecSnap.docs.forEach(d => batch2.push(deleteDoc(doc(db, `users/${currentUser.uid}/kovan_gecmis/${d.id}`))));
+    veri.kovan_gecmis?.forEach(k => { const { id, ...data } = k; batch2.push(setDoc(doc(db, `users/${currentUser.uid}/kovan_gecmis/${id}`), data)); });
+
+    await Promise.all(batch2);
+
+    // Ayarları geri yükle
+    if (veri.gruplar) { localStorage.setItem("arilık_gruplar", JSON.stringify(veri.gruplar)); }
+    if (veri.tipler) { localStorage.setItem("kovan_tipleri", JSON.stringify(veri.tipler)); }
+    if (veri.bannedNumbers) { localStorage.setItem("banned_hive_numbers", JSON.stringify(veri.bannedNumbers)); }
+    await saveAyarlarToFirestore();
+
+    showToast("✓ Yedek başarıyla geri yüklendi!");
+    loadAll();
+  } catch(e) {
+    showToast("⚠️ Hata: " + e.message);
+  }
+  event.target.value = "";
+}
+
 // ─── GLOBAL EXPOSE ──────────────────────────────────────────────
 function temizleGrupFilter() { activeGrupFilter = null; renderHives(); }
 function filterByType(tip) {
@@ -2181,6 +2332,9 @@ window.renderKatCitaFields = renderKatCitaFields;
 window.tipEkle = tipEkle;
 window.tipSil = tipSil;
 window.saveAyarlarToFirestore = saveAyarlarToFirestore;
+window.yedekAl = yedekAl;
+window.yedekAlExcel = yedekAlExcel;
+window.yedekYukle = yedekYukle;
 window.applyTabOrder = applyTabOrder;
 window.getTabOrder = getTabOrder;
 window.renderTopluHiveList = renderTopluHiveList;
