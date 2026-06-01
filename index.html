@@ -417,8 +417,14 @@
       <label>Koloni Gücü (1–10)</label>
       <div class="range-wrap"><input type="range" id="hive-strength" min="1" max="10" value="5"><span class="range-val" id="hive-strength-val">5</span></div>
     </div>
-    <div class="field"><label>Kat Sayısı</label><select class="input" id="hive-floors"><option value="1">1 Kat</option><option value="2">2 Kat</option><option value="3">3 Kat</option></select></div>
-    <div class="field"><label>Çıta Sayısı</label><input class="input" id="hive-frames" type="number" min="1" max="50" placeholder="10"></div>
+    <div class="field"><label>Kat Sayısı</label>
+      <select class="input" id="hive-floors" onchange="renderKatCitaFields()">
+        <option value="1">1 Kat</option>
+        <option value="2">2 Kat</option>
+        <option value="3">3 Kat</option>
+      </select>
+    </div>
+    <div id="kat-cita-fields"></div>
     <div class="field"><label>Bal (kg)</label><input class="input" id="hive-honey" type="number" min="0" placeholder="0"></div>
     <div class="field">
       <label>Renk</label>
@@ -658,7 +664,7 @@ function renderHives() {
         </div>
         <div style="text-align:right">
           <div class="card-meta-item">🏠 Kat / Çıta</div>
-          <div class="card-meta-val">${h.floors||1} kat · ${h.frames || (h.floors||1)*getFramesPerFloor()} çıta</div>
+          <div class="card-meta-val" style="font-size:12px;line-height:1.6">${renderKatCitaText(h)}</div>
         </div>
         <div style="text-align:right">
           <div class="card-meta-item">🍯 Bal</div>
@@ -711,7 +717,7 @@ window.editHive = function(id) {
   updatePosLabel();
   renderMiniGrid();
   $("hive-floors").value = h.floors||1;
-  $("hive-frames").value = h.frames||"";
+  renderKatCitaFields(h.frames);
   $("hive-honey").value = h.honey||0;
   $("hive-notes").value = h.notes||"";
   renderColorPicker(h.color||HIVE_COLORS[0]);
@@ -835,7 +841,7 @@ $("hive-save").onclick = async () => {
     strength: Number($("hive-strength").value),
     pos: selectedPos,
     floors: Number($("hive-floors").value||1),
-    frames: Number($("hive-frames").value||0),
+    frames: getKatCitaValues(),
     honey: Number($("hive-honey").value||0),
     notes: $("hive-notes").value.trim(),
     color: selectedColor,
@@ -929,7 +935,7 @@ $("fab-btn").onclick = () => {
     $("hive-type").value = "Langstroth";
     $("hive-strength").value = 5; $("hive-strength-val").textContent = 5;
     selectedPos = null;
-    $("hive-frames").value = "";
+    renderKatCitaFields();
     updatePosLabel();
     renderMiniGrid();
     renderColorPicker(HIVE_COLORS[0]);
@@ -1058,6 +1064,43 @@ function renderSettings() {
   renderTabOrderList();
 }
 
+function renderKatCitaFields(existing) {
+  const floors = parseInt($("hive-floors").value) || 1;
+  const el = $("kat-cita-fields");
+  if (!el) return;
+  // existing: array [10,8,6] veya number (eski format) veya undefined
+  let vals = [];
+  if (Array.isArray(existing)) vals = existing;
+  else if (typeof existing === "number" && existing > 0) vals = [existing];
+  el.innerHTML = Array.from({length: floors}).map((_, i) => `
+    <div class="field" style="margin-bottom:8px">
+      <label>${i+1}. Kat Çıta Sayısı</label>
+      <input class="input" id="kat-cita-${i}" type="number" min="1" max="50"
+        placeholder="10" value="${vals[i] || ""}">
+    </div>`).join("");
+}
+
+function getKatCitaValues() {
+  const floors = parseInt($("hive-floors").value) || 1;
+  return Array.from({length: floors}).map((_, i) => {
+    const val = parseInt($(`kat-cita-${i}`)?.value);
+    return val > 0 ? val : getFramesPerFloor();
+  });
+}
+
+function renderKatCitaText(h) {
+  const floors = h.floors || 1;
+  const frames = h.frames;
+  if (Array.isArray(frames)) {
+    return frames.map((f, i) => `${i+1}.Kat: ${f}ç`).join(" · ");
+  } else if (typeof frames === "number" && frames > 0) {
+    return `1.Kat: ${frames}ç`;
+  }
+  // Varsayılan
+  const def = getFramesPerFloor();
+  return Array.from({length: floors}).map((_, i) => `${i+1}.Kat: ${def}ç`).join(" · ");
+}
+
 function saveFramesSetting() {
   const val = parseInt($("set-frames").value);
   if (!val || val < 1) return;
@@ -1116,7 +1159,7 @@ function renderTopluHiveList() {
         style="accent-color:var(--amber);width:17px;height:17px;flex-shrink:0">
       <div class="hex-icon" style="background:${h.color||"#F59E0B"};width:28px;height:24px;font-size:12px;flex-shrink:0">🐝</div>
       <span style="font-size:13px;font-weight:600;color:var(--brown);flex:1">${h.name}</span>
-      <span style="font-size:11px;color:var(--gray)">${h.floors||1}k · ${h.frames||(h.floors||1)*getFramesPerFloor()}ç</span>
+      <span style="font-size:11px;color:var(--gray)">${renderKatCitaText(h)}</span>
     </label>`;
   }).join("");
 }
