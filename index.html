@@ -260,6 +260,10 @@
     <div id="schedule-list"><div class="loading">⏳</div></div>
   </div>
 
+  <div class="content" id="tab-gecmis" style="display:none">
+    <div id="gecmis-content"><div class="loading">⏳</div></div>
+  </div>
+
   <div class="content" id="tab-records" style="display:none">
     <!-- Toplu Uygulama Bölümü -->
     <div style="margin-bottom:14px">
@@ -518,6 +522,16 @@
   </div>
 </div>
 
+
+<!-- MODAL: Kovan İşlem -->
+<div class="modal-overlay" id="modal-kovan-islem">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="kovan-islem-baslik">⬇️ Kovan İşlemi</div>
+    <div id="kovan-islem-icerik"></div>
+  </div>
+</div>
+
 <!-- MODAL: Kovan Detay (Kroki) -->
 <div class="modal-overlay" id="modal-kovan-detay">
   <div class="modal">
@@ -651,7 +665,7 @@ onAuthStateChanged(auth, async (user) => {
 const col = (name) => collection(db, `users/${currentUser.uid}/${name}`);
 
 async function loadAll() {
-  await Promise.all([loadHives(), loadSchedules(), loadRecords()]);
+  await Promise.all([loadHives(), loadSchedules(), loadRecords(), loadKovanGecmis()]);
 }
 
 async function loadHives() {
@@ -734,7 +748,7 @@ function renderHives() {
       ${h.notes ? `<div style="margin-top:8px;font-size:12px;color:var(--gray);border-top:1px dashed var(--gray2);padding-top:8px">${h.notes}</div>` : ''}
       <div style="margin-top:10px;display:flex;gap:8px">
         <button onclick="event.stopPropagation();editHive('${h.id}')" style="flex:1;padding:7px;border:1px solid var(--gray2);border-radius:8px;background:var(--white);cursor:pointer;font-size:12px">✏️ Düzenle</button>
-        <button onclick="event.stopPropagation();deleteHive('${h.id}')" style="flex:1;padding:7px;border:1px solid #FEE2E2;border-radius:8px;background:#FFF5F5;cursor:pointer;font-size:12px;color:var(--red)">🗑️ Sil</button>
+        <button onclick="event.stopPropagation();kovanIslemModal('${h.id}')" style="flex:1;padding:7px;border:1px solid #FEE2E2;border-radius:8px;background:#FFF5F5;cursor:pointer;font-size:12px;color:var(--red)">⬇️ İşlem</button>
       </div>
     </div>`;
   }).join("");
@@ -785,16 +799,22 @@ window.editHive = function(id) {
   openModal("modal-hive");
 };
 
-window.deleteHive = async function(id) {
-  if (!confirm("Bu kovanı silmek istiyor musun?")) return;
-  // Numarayı yasaklılar listesine ekle
+window.deleteHive = async function(id, durum, not) {
   const hive = hives.find(h => h.id === id);
-  if (hive && hive.name) {
-    const num = parseInt(hive.name);
-    if (num > 0) addBannedNumber(num);
-  }
+  if (!hive) return;
+  // Numarayı yasaklılar listesine ekle
+  const num = parseInt(hive.name);
+  if (num > 0) addBannedNumber(num);
+  // Geçmiş kaydı oluştur
+  await addDoc(col("kovan_gecmis"), {
+    ...hive,
+    arsivDurum: durum, // "satildi" | "sondü" | "silindi"
+    arsivNot: not || "",
+    arsivTarih: new Date().toISOString().split("T")[0],
+    arsivAt: serverTimestamp(),
+  });
   await deleteDoc(doc(db, `users/${currentUser.uid}/kovanllar/${id}`));
-  showToast("Kovan silindi");
+  showToast(durum === "satildi" ? "Kovan satıldı ✓" : durum === "söndü" ? "Kovan söndü olarak işaretlendi" : "Kovan silindi");
   loadAll();
 };
 
@@ -1058,6 +1078,7 @@ const TAB_DEFS = [
   { key: "kroki",    label: "🗺️ Kroki" },
   { key: "schedule", label: "📋 Takvim" },
   { key: "records",  label: "📝 Kayıtlar" },
+  { key: "gecmis",   label: "📜 Geçmiş" },
 ];
 
 function getTabOrder() {
@@ -1099,6 +1120,7 @@ function applyTabOrder(order) {
       $("tab-hives").style.display    = activeTab === "hives"    ? "" : "none";
       $("tab-schedule").style.display = activeTab === "schedule" ? "" : "none";
       $("tab-records").style.display  = activeTab === "records"  ? "" : "none";
+      $("tab-gecmis").style.display   = activeTab === "gecmis"   ? "" : "none";
       $("tab-kroki").style.display    = activeTab === "kroki"    ? "" : "none";
       $("tab-settings").style.display = activeTab === "settings" ? "" : "none";
       if (activeTab === "kroki") renderKroki();
@@ -1227,6 +1249,98 @@ function saveFramesSetting() {
 }
 
 
+
+
+// ─── KOVAN GEÇMİŞİ & İŞLEM ──────────────────────────────────────
+let kovanGecmis = [];
+
+async function loadKovanGecmis() {
+  const snap = await getDocs(query(col("kovan_gecmis"), orderBy("arsivAt", "desc")));
+  kovanGecmis = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  renderGecmis();
+}
+
+function renderGecmis() {
+  const el = $("gecmis-content");
+  if (!el) return;
+
+  if (!kovanGecmis.length) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">📜</div><div class="empty-text">Geçmiş kayıt yok</div></div>`;
+    return;
+  }
+
+  const durumIcon = { satildi: "💰", "söndü": "💀", silindi: "🗑️" };
+  const durumLabel = { satildi: "Satıldı", "söndü": "Söndü", silindi: "Silindi" };
+  const durumColor = { satildi: "var(--green2)", "söndü": "var(--red)", silindi: "var(--gray)" };
+
+  el.innerHTML = kovanGecmis.map(k => `
+    <div style="background:var(--white);border-radius:var(--radius);padding:14px;margin-bottom:10px;
+                box-shadow:var(--shadow);border-left:4px solid ${durumColor[k.arsivDurum]||'var(--gray2)'}">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <div class="hex-icon" style="background:${k.color||'#9CA3AF'};width:36px;height:31px;font-size:14px">🐝</div>
+        <div style="flex:1">
+          <div style="font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:var(--brown)">${k.name}. Kovan</div>
+          <div style="font-size:12px;color:var(--gray)">${k.type||''} ${k.location?'· '+k.location:''}</div>
+        </div>
+        <span style="font-size:12px;font-weight:700;color:${durumColor[k.arsivDurum]||'var(--gray)'};
+          background:var(--cream2);padding:3px 10px;border-radius:20px">
+          ${durumIcon[k.arsivDurum]||''} ${durumLabel[k.arsivDurum]||k.arsivDurum}
+        </span>
+      </div>
+      <div style="display:flex;gap:12px;font-size:12px;color:var(--gray)">
+        <span>📅 ${k.arsivTarih||'—'}</span>
+        ${k.arsivNot ? `<span>📝 ${k.arsivNot}</span>` : ''}
+      </div>
+    </div>`).join("");
+}
+
+window.kovanIslemModal = function(id) {
+  const hive = hives.find(h => h.id === id);
+  if (!hive) return;
+  $("kovan-islem-baslik").textContent = `${hive.name}. Kovan — İşlem`;
+  $("kovan-islem-icerik").innerHTML = `
+    <p style="font-size:14px;color:var(--gray);margin-bottom:16px">Bu kovan için ne yapmak istiyorsunuz?</p>
+    <div class="field"><label>Not (opsiyonel)</label>
+      <input class="input" id="islem-not" placeholder="Alıcı adı, sebep...">
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
+      <button onclick="kovanIslemOnayla('${id}','satildi')"
+        style="width:100%;padding:13px;background:var(--green2);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">
+        💰 Satıldı
+      </button>
+      <button onclick="kovanIslemOnayla('${id}','söndü')"
+        style="width:100%;padding:13px;background:var(--red);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">
+        💀 Söndü
+      </button>
+      <button onclick="kovanIslemOnayla('${id}','silindi')"
+        style="width:100%;padding:13px;background:var(--gray);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">
+        🗑️ Sil (Hatalı Giriş)
+      </button>
+      <button onclick="closeModal('modal-kovan-islem')"
+        style="width:100%;padding:11px;background:none;border:1.5px solid var(--gray2);border-radius:10px;font-size:14px;cursor:pointer;font-family:inherit;color:var(--brown2)">
+        İptal
+      </button>
+    </div>`;
+  openModal("modal-kovan-islem");
+};
+
+window.kovanIslemOnayla = function(id, durum) {
+  const hive = hives.find(h => h.id === id);
+  if (!hive) return;
+  const not = $("islem-not")?.value?.trim() || "";
+  const mesajlar = {
+    satildi: `${hive.name}. Kovan satıldı olarak işaretlenecek ve geçmişe taşınacak.`,
+    "söndü": `${hive.name}. Kovan söndü olarak işaretlenecek ve geçmişe taşınacak.`,
+    silindi: `${hive.name}. Kovan silinecek. Bu işlem geri alınamaz!`,
+  };
+  if (!confirm(`⚠️ ONAY
+
+${mesajlar[durum]}
+
+Devam etmek istiyor musunuz?`)) return;
+  closeModal("modal-kovan-islem");
+  deleteHive(id, durum, not);
+};
 
 // ─── GRUP YÖNETİMİ ──────────────────────────────────────────────
 function getGruplar() {
@@ -1724,7 +1838,7 @@ window.selectHiveFromKroki = function(id) {
 
 function switchTab(key) {
   activeTab = key;
-  const allKeys = ["home","hives","schedule","records","kroki","settings"];
+  const allKeys = ["home","hives","schedule","records","gecmis","kroki","settings"];
   allKeys.forEach(k => {
     const el = $("tab-" + k);
     if (el) el.style.display = activeTab === k ? "" : "none";
@@ -1733,18 +1847,19 @@ function switchTab(key) {
   if (activeTab === "kroki") renderKroki();
   if (activeTab === "settings") renderSettings();
   if (activeTab === "home") renderHome();
+  if (activeTab === "gecmis") renderGecmis();
 }
 
 // Başlangıçta kayıtlı sekme sırası uygula
 applyTabOrder(getTabOrder());
 activeTab = "home";
 document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === "home"));
-["tab-home","tab-hives","tab-schedule","tab-records","tab-kroki","tab-settings"].forEach(id => {
+["tab-home","tab-hives","tab-schedule","tab-records","tab-gecmis","tab-kroki","tab-settings"].forEach(id => {
   const el = $(id); if(el) el.style.display = id === "tab-home" ? "" : "none";
 });
 
 // Close modals on overlay click
-["modal-hive","modal-sched","modal-rec","modal-kovan-detay"].forEach(id => {
+["modal-hive","modal-sched","modal-rec","modal-kovan-detay","modal-kovan-islem"].forEach(id => {
   $(id).onclick = e => { if (e.target === $(id)) closeModal(id); };
 });
 </script>
