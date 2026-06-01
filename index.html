@@ -2077,6 +2077,23 @@ Emin misin?`)) return;
 }
 window.testSil = testSil;
 
+
+// ─── GERİ TUŞU ───────────────────────────────────────────────────
+history.pushState({ tab: "home" }, "", window.location.href);
+
+window.addEventListener("popstate", function() {
+  if (activeTab === "home") {
+    if (confirm("Uygulamadan çıkmak istiyor musunuz?")) {
+      history.go(-1);
+    } else {
+      history.pushState({ tab: "home" }, "", window.location.href);
+    }
+  } else {
+    switchTab("home");
+    history.pushState({ tab: "home" }, "", window.location.href);
+  }
+});
+
 // ─── GLOBAL EXPOSE ──────────────────────────────────────────────
 function temizleGrupFilter() { activeGrupFilter = null; renderHives(); }
 function filterByType(tip) {
