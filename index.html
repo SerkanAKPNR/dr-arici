@@ -633,7 +633,13 @@ $("btn-register").onclick = async () => {
     await createUserWithEmailAndPassword(auth, e, p);
   } catch(err) { showAuthError(err.code); }
 };
-$("btn-logout").onclick = () => signOut(auth);
+$("btn-logout").onclick = () => {
+  if (_unsubHives) _unsubHives();
+  if (_unsubSchedules) _unsubSchedules();
+  if (_unsubRecords) _unsubRecords();
+  if (_unsubGecmis) _unsubGecmis();
+  signOut(auth);
+};
 
 function showAuthError(code) {
   const msgs = {
@@ -664,26 +670,39 @@ onAuthStateChanged(auth, async (user) => {
 // ─── FIRESTORE HELPERS ──────────────────────────────────────────
 const col = (name) => collection(db, `users/${currentUser.uid}/${name}`);
 
-async function loadAll() {
-  await Promise.all([loadHives(), loadSchedules(), loadRecords(), loadKovanGecmis()]);
+function loadAll() {
+  loadHives();
+  loadSchedules();
+  loadRecords();
+  loadKovanGecmis();
 }
 
-async function loadHives() {
-  const snap = await getDocs(query(col("kovanllar"), orderBy("createdAt", "asc")));
-  hives = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  renderHives();
-  updateStats();
+// Dinleyici referansları
+let _unsubHives = null, _unsubSchedules = null, _unsubRecords = null, _unsubGecmis = null;
+
+function loadHives() {
+  if (_unsubHives) _unsubHives();
+  _unsubHives = onSnapshot(query(col("kovanllar"), orderBy("createdAt", "asc")), snap => {
+    hives = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderHives();
+    renderHome();
+    updateStats();
+  });
 }
-async function loadSchedules() {
-  const snap = await getDocs(query(col("takvim"), orderBy("date", "asc")));
-  schedules = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  renderSchedule();
-  updateStats();
+function loadSchedules() {
+  if (_unsubSchedules) _unsubSchedules();
+  _unsubSchedules = onSnapshot(query(col("takvim"), orderBy("date", "asc")), snap => {
+    schedules = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderSchedule();
+    updateStats();
+  });
 }
-async function loadRecords() {
-  const snap = await getDocs(query(col("kayitlar"), orderBy("date", "desc")));
-  records = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  renderRecords();
+function loadRecords() {
+  if (_unsubRecords) _unsubRecords();
+  _unsubRecords = onSnapshot(query(col("kayitlar"), orderBy("date", "desc")), snap => {
+    records = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderRecords();
+  });
 }
 
 // ─── STATS ──────────────────────────────────────────────────────
@@ -1256,10 +1275,12 @@ function saveFramesSetting() {
 // ─── KOVAN GEÇMİŞİ & İŞLEM ──────────────────────────────────────
 let kovanGecmis = [];
 
-async function loadKovanGecmis() {
-  const snap = await getDocs(query(col("kovan_gecmis"), orderBy("arsivAt", "desc")));
-  kovanGecmis = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  renderGecmis();
+function loadKovanGecmis() {
+  if (_unsubGecmis) _unsubGecmis();
+  _unsubGecmis = onSnapshot(query(col("kovan_gecmis"), orderBy("arsivAt", "desc")), snap => {
+    kovanGecmis = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderGecmis();
+  });
 }
 
 function renderGecmis() {
