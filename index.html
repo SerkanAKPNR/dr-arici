@@ -1808,7 +1808,6 @@ async function topluKaydet() {
   if (!drug || !date) { showToast("Başlık ve tarih gerekli"); return; }
   if (!topluSeciliKovanlar.size) { showToast("En az bir kovan seç"); return; }
 
-  const type = $("toplu-type").value;
   const note = $("toplu-note").value.trim();
   const repeat = $("toplu-repeat-check").checked;
   const days = parseInt($("toplu-days")?.value || "10");
