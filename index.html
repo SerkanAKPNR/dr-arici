@@ -709,7 +709,7 @@ function renderHives() {
     const label = g ? g.ad : "Grupsuz Kovanlar";
     filterHeader = `<div style="display:flex;align-items:center;gap:8px;background:var(--amber4);border-radius:10px;padding:8px 12px;margin-bottom:10px;font-size:13px">
       <span style="flex:1;font-weight:600;color:var(--brown)">📂 ${label}</span>
-      <button onclick="activeGrupFilter=null;renderHives()" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--gray)">✕</button>
+      <button onclick="temizleGrupFilter()" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--gray)">✕</button>
     </div>`;
   }
 
@@ -749,6 +749,7 @@ function renderHives() {
       <div style="margin-top:10px;display:flex;gap:8px">
         <button onclick="event.stopPropagation();editHive('${h.id}')" style="flex:1;padding:7px;border:1px solid var(--gray2);border-radius:8px;background:var(--white);cursor:pointer;font-size:12px">✏️ Düzenle</button>
         <button onclick="event.stopPropagation();kovanIslemModal('${h.id}')" style="flex:1;padding:7px;border:1px solid #FEE2E2;border-radius:8px;background:#FFF5F5;cursor:pointer;font-size:12px;color:var(--red)">⬇️ İşlem</button>
+        <button onclick="event.stopPropagation();testSil('${h.id}')" style="padding:7px 10px;border:1px solid var(--gray2);border-radius:8px;background:var(--white);cursor:pointer;font-size:12px;color:var(--gray)" title="Test Sil — kalıcı, geçmişe gitmez, numara serbest kalır">🧹</button>
       </div>
     </div>`;
   }).join("");
@@ -1482,6 +1483,7 @@ function homeGrupAc(grupId) {
   renderHives();
 }
 
+window.activeGrupFilter = null;
 let activeGrupFilter = null;
 
 // ─── TOPLU UYGULAMA ──────────────────────────────────────────────
@@ -1862,6 +1864,50 @@ document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.da
 ["modal-hive","modal-sched","modal-rec","modal-kovan-detay","modal-kovan-islem"].forEach(id => {
   $(id).onclick = e => { if (e.target === $(id)) closeModal(id); };
 });
+// ─── TEST SİL ────────────────────────────────────────────────────
+async function testSil(id) {
+  const hive = hives.find(h => h.id === id);
+  if (!hive) return;
+  if (!confirm(`🧹 TEST SİL
+
+"${hive.name}. Kovan" kalıcı olarak silinecek.
+Geçmişe gitmez, numara serbest kalır.
+
+Emin misin?`)) return;
+  await deleteDoc(doc(db, `users/${currentUser.uid}/kovanllar/${id}`));
+  showToast("Test kovanı silindi, numara serbest ✓");
+  loadAll();
+}
+window.testSil = testSil;
+
+// ─── GLOBAL EXPOSE ──────────────────────────────────────────────
+function temizleGrupFilter() { activeGrupFilter = null; renderHives(); }
+window.temizleGrupFilter = temizleGrupFilter;
+window.closeModal = closeModal;
+window.deleteRecord = deleteRecord;
+window.grupEkle = grupEkle;
+window.grupSil = grupSil;
+window.renderGrupListesi = renderGrupListesi;
+window.populateGroupSelect = populateGroupSelect;
+window.renderHome = renderHome;
+window.homeGrupAc = homeGrupAc;
+window.kovanIslemModal = kovanIslemModal;
+window.kovanIslemOnayla = kovanIslemOnayla;
+window.renderGecmis = renderGecmis;
+window.loadKovanGecmis = loadKovanGecmis;
+window.toggleTopluPanel = toggleTopluPanel;
+window.topluHepsiniSec = topluHepsiniSec;
+window.topluSiraFiltresiAc = topluSiraFiltresiAc;
+window.topluSiraFiltrele = topluSiraFiltrele;
+window.topluKaydet = topluKaydet;
+window.topluToggleKovan = topluToggleKovan;
+window.saveTabOrder = saveTabOrder;
+window.saveFramesSetting = saveFramesSetting;
+window.toggleRepeat = toggleRepeat;
+window.selectHive = selectHive;
+window.selectPos = selectPos;
+window.pickColor = pickColor;
+window.toggleTopluPanel = toggleTopluPanel;
 </script>
 </body>
 </html>
