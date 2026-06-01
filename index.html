@@ -763,11 +763,7 @@ function updateStats() {
         <div class="stat-val">${sayi}</div><div class="stat-lbl">${tip}</div>
       </div>`;
     });
-    // Bekleyen görev
-    const bekleyen = schedules.filter(s => !s.done).length;
-    html += `<div class="stat-card" style="background:rgba(255,255,255,.15);color:#fff">
-      <div class="stat-val">${bekleyen}</div><div class="stat-lbl">Bekleyen</div>
-    </div>`;
+
     tiplerEl.innerHTML = html;
   }
 
