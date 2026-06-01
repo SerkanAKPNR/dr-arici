@@ -235,6 +235,7 @@
     <button class="tab active" data-tab="hives">🏠 Kovanlar</button>
     <button class="tab" data-tab="schedule">📋 Takvim</button>
     <button class="tab" data-tab="records">📝 Kayıtlar</button>
+    <button class="tab" data-tab="kroki">🗺️ Kroki</button>
   </div>
 
   <!-- Content -->
@@ -259,6 +260,11 @@
     <div id="records-list"><div class="loading">⏳</div></div>
   </div>
 
+  <div class="content" id="tab-kroki" style="display:none">
+    <div style="font-size:13px;color:var(--gray);margin-bottom:10px;text-align:center">Boş hücreye tıklayarak kovan yerleştirebilirsiniz</div>
+    <div id="kroki-grid" style="overflow-x:auto;padding-bottom:8px"></div>
+  </div>
+
   <button class="fab" id="fab-btn">+</button>
 </div>
 
@@ -280,15 +286,21 @@
     <div class="field"><label>Kraliçe Irkı</label><input class="input" id="hive-breed" placeholder="Kafkas, Karniyol..."></div>
     <div class="field"><label>Kraliçe Yılı</label><input class="input" id="hive-queen" placeholder="2024" type="number" min="2015" max="2030"></div>
     <div class="field">
-      <label>Koloni Gücü (1–5)</label>
-      <div class="range-wrap"><input type="range" id="hive-strength" min="1" max="5" value="3"><span class="range-val" id="hive-strength-val">3</span></div>
+      <label>Koloni Gücü (1–10)</label>
+      <div class="range-wrap"><input type="range" id="hive-strength" min="1" max="10" value="5"><span class="range-val" id="hive-strength-val">5</span></div>
     </div>
+    <div class="field"><label>Kat Sayısı</label><select class="input" id="hive-floors"><option value="1">1 Kat</option><option value="2">2 Kat</option><option value="3">3 Kat</option></select></div>
     <div class="field"><label>Bal (kg)</label><input class="input" id="hive-honey" type="number" min="0" placeholder="0"></div>
     <div class="field">
       <label>Renk</label>
       <div class="color-picker" id="hive-color-picker"></div>
     </div>
     <div class="field"><label>Not</label><textarea class="input" id="hive-notes" placeholder="Opsiyonel..."></textarea></div>
+    <div class="field">
+      <label>Arılıktaki Konum</label>
+      <div id="pos-selected" style="font-size:13px;color:var(--amber);margin-bottom:6px;min-height:18px"></div>
+      <div id="mini-grid" style="overflow-x:auto;padding-bottom:4px"></div>
+    </div>
     <div class="btn-row">
       <button class="btn btn-outline" id="hive-cancel">İptal</button>
       <button class="btn btn-primary" id="hive-save">Kaydet</button>
@@ -480,7 +492,7 @@ function renderHives() {
   }
   el.innerHTML = hives.map(h => {
     const tasks = schedules.filter(s => s.hiveId === h.id && !s.done).length;
-    const dots = Array.from({length:5}).map((_,i) =>
+    const dots = Array.from({length:10}).map((_,i) =>
       `<div class="dot" style="background:${i < h.strength ? '#F59E0B' : '#E5E7EB'}"></div>`
     ).join("");
     return `
@@ -501,6 +513,10 @@ function renderHives() {
         <div style="text-align:right">
           <div class="card-meta-item">Kraliçe</div>
           <div class="card-meta-val">${h.queen||'—'} ${h.breed ? '· '+h.breed : ''}</div>
+        </div>
+        <div style="text-align:right">
+          <div class="card-meta-item">🏠 Kat</div>
+          <div class="card-meta-val">${h.floors||1} kat</div>
         </div>
         <div style="text-align:right">
           <div class="card-meta-item">🍯 Bal</div>
@@ -547,8 +563,12 @@ window.editHive = function(id) {
   $("hive-type").value = h.type||"Langstroth";
   $("hive-breed").value = h.breed||"";
   $("hive-queen").value = h.queen||"";
-  $("hive-strength").value = h.strength||3;
-  $("hive-strength-val").textContent = h.strength||3;
+  $("hive-strength").value = h.strength||5;
+  $("hive-strength-val").textContent = h.strength||5;
+  selectedPos = h.pos || null;
+  updatePosLabel();
+  renderMiniGrid();
+  $("hive-floors").value = h.floors||1;
   $("hive-honey").value = h.honey||0;
   $("hive-notes").value = h.notes||"";
   renderColorPicker(h.color||HIVE_COLORS[0]);
@@ -670,6 +690,8 @@ $("hive-save").onclick = async () => {
     breed: $("hive-breed").value.trim(),
     queen: $("hive-queen").value,
     strength: Number($("hive-strength").value),
+    pos: selectedPos,
+    floors: Number($("hive-floors").value||1),
     honey: Number($("hive-honey").value||0),
     notes: $("hive-notes").value.trim(),
     color: selectedColor,
@@ -738,6 +760,8 @@ document.querySelectorAll(".tab").forEach(btn => {
     $("tab-hives").style.display   = activeTab === "hives"    ? "" : "none";
     $("tab-schedule").style.display = activeTab === "schedule" ? "" : "none";
     $("tab-records").style.display  = activeTab === "records"  ? "" : "none";
+    $("tab-kroki").style.display    = activeTab === "kroki"    ? "" : "none";
+    if (activeTab === "kroki") renderKroki();
   };
 });
 
@@ -757,9 +781,15 @@ $("fab-btn").onclick = () => {
     $("hive-modal-title").textContent = "🐝 Yeni Kovan";
     ["hive-name","hive-loc","hive-breed","hive-queen","hive-honey","hive-notes"].forEach(id => $(id).value = "");
     $("hive-type").value = "Langstroth";
-    $("hive-strength").value = 3; $("hive-strength-val").textContent = 3;
+    $("hive-strength").value = 5; $("hive-strength-val").textContent = 5;
+    selectedPos = null;
+    updatePosLabel();
+    renderMiniGrid();
     renderColorPicker(HIVE_COLORS[0]);
     openModal("modal-hive");
+  } else if (activeTab === "kroki") {
+    // kroki tab - fab does nothing extra
+    return;
   } else if (activeTab === "schedule") {
     populateHiveSelects();
     $("sched-date").value = today();
@@ -771,6 +801,115 @@ $("fab-btn").onclick = () => {
     $("rec-note").value = ""; $("rec-winter").value = "";
     openModal("modal-rec");
   }
+};
+
+
+// ─── KROKI ───────────────────────────────────────────────────────
+const ROWS = 3, COLS = 30;
+let selectedPos = null; // {row, col}
+
+function posKey(r, c) { return `${r}-${c}`; }
+function hiveAtPos(r, c) { return hives.find(h => h.pos && h.pos.row === r && h.pos.col === c); }
+
+function updatePosLabel() {
+  const el = $("pos-selected");
+  if (!el) return;
+  el.textContent = selectedPos
+    ? `✅ Sıra ${selectedPos.row + 1}, Kolon ${selectedPos.col + 1} seçildi`
+    : "Henüz konum seçilmedi";
+}
+
+function renderMiniGrid() {
+  const el = $("mini-grid");
+  if (!el) return;
+  let html = `<div style="display:flex;flex-direction:column;gap:3px;min-width:${COLS*22}px">`;
+  for (let r = 0; r < ROWS; r++) {
+    html += `<div style="display:flex;gap:3px;align-items:center">`;
+    html += `<span style="font-size:10px;color:var(--gray);width:14px;flex-shrink:0">${r+1}</span>`;
+    for (let c = 0; c < COLS; c++) {
+      const hive = hiveAtPos(r, c);
+      const isSel = selectedPos && selectedPos.row === r && selectedPos.col === c;
+      const isOccupied = hive && !(editingHiveId && hive.id === editingHiveId);
+      let bg = '#F3F4F6', border = '#E5E7EB', cursor = 'pointer';
+      if (isOccupied) { bg = hive.color || '#F59E0B'; border = hive.color || '#F59E0B'; cursor = 'not-allowed'; }
+      else if (isSel) { bg = '#FCD34D'; border = '#D97706'; }
+      html += `<div onclick="selectPos(${r},${c})"
+        title="${isOccupied ? hive.name : `Sıra ${r+1}, Kolon ${c+1}`}"
+        style="width:18px;height:18px;border-radius:3px;background:${bg};border:1.5px solid ${border};cursor:${cursor};flex-shrink:0;transition:all .1s"></div>`;
+    }
+    html += `</div>`;
+  }
+  html += `</div>`;
+  el.innerHTML = html;
+}
+
+function renderKroki() {
+  const el = $("kroki-grid");
+  if (!el) return;
+  let html = `<div style="display:flex;flex-direction:column;gap:6px;min-width:${COLS*28+24}px">`;
+  // Column numbers header
+  html += `<div style="display:flex;gap:4px;padding-left:22px">`;
+  for (let c = 0; c < COLS; c++) {
+    html += `<div style="width:24px;text-align:center;font-size:9px;color:var(--gray);flex-shrink:0">${c+1}</div>`;
+  }
+  html += `</div>`;
+  for (let r = 0; r < ROWS; r++) {
+    html += `<div style="display:flex;gap:4px;align-items:center">`;
+    html += `<span style="font-size:11px;font-weight:700;color:var(--brown2);width:18px;flex-shrink:0">${r+1}</span>`;
+    for (let c = 0; c < COLS; c++) {
+      const hive = hiveAtPos(r, c);
+      if (hive) {
+        html += `<div onclick="selectHiveFromKroki('${hive.id}')"
+          title="${hive.name}&#10;${hive.floors||1} kat · Güç: ${hive.strength||1}/10"
+          style="width:24px;height:36px;border-radius:4px;background:${hive.color||'#F59E0B'};border:2px solid ${hive.color||'#F59E0B'};
+          cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+          font-size:10px;color:#fff;font-weight:700;flex-direction:column;gap:1px;
+          box-shadow:0 2px 6px rgba(0,0,0,.15);transition:transform .15s"
+          onmouseover="this.style.transform='scale(1.15)'" onmouseout="this.style.transform='scale(1)'">
+          🐝<span style="font-size:8px">${hive.name.replace('Kovan ','K')}</span>
+          </div>`;
+      } else {
+        html += `<div title="Sıra ${r+1}, Kolon ${c+1} — Boş"
+          style="width:24px;height:36px;border-radius:4px;background:#F9FAFB;border:1.5px dashed #D1D5DB;
+          cursor:pointer;flex-shrink:0;transition:background .15s"
+          onmouseover="this.style.background='#FEF3C7'" onmouseout="this.style.background='#F9FAFB'"></div>`;
+      }
+    }
+    html += `</div>`;
+  }
+  html += `</div>`;
+
+  // Legend
+  html += `<div style="margin-top:14px;font-size:12px;color:var(--gray);display:flex;gap:16px;flex-wrap:wrap">`;
+  html += `<span>🐝 Dolu kovan</span><span style="display:flex;align-items:center;gap:4px"><span style="width:14px;height:14px;border-radius:3px;background:#F9FAFB;border:1.5px dashed #D1D5DB;display:inline-block"></span> Boş</span>`;
+  html += `</div>`;
+
+  el.innerHTML = html;
+}
+
+window.selectPos = function(r, c) {
+  const hive = hiveAtPos(r, c);
+  if (hive && !(editingHiveId && hive.id === editingHiveId)) return;
+  selectedPos = selectedPos && selectedPos.row === r && selectedPos.col === c ? null : {row: r, col: c};
+  updatePosLabel();
+  renderMiniGrid();
+};
+
+window.selectHiveFromKroki = function(id) {
+  selectedHiveId = selectedHiveId === id ? null : id;
+  renderHives();
+  updateDetailBanners();
+  renderSchedule();
+  renderRecords();
+  // Switch to hives tab
+  activeTab = "hives";
+  document.querySelectorAll(".tab").forEach(t => {
+    t.classList.toggle("active", t.dataset.tab === "hives");
+  });
+  $("tab-hives").style.display = "";
+  $("tab-schedule").style.display = "none";
+  $("tab-records").style.display = "none";
+  $("tab-kroki").style.display = "none";
 };
 
 // Close modals on overlay click
