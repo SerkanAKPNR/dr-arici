@@ -63,10 +63,10 @@
   .header-logo { display: flex; align-items: center; gap: 10px; }
   .header-logo span { font-family: 'Playfair Display', serif; font-size: 20px; }
   .header-logout { background: rgba(255,255,255,.2); border: none; color: var(--white); border-radius: 8px; padding: 6px 12px; font-size: 12px; cursor: pointer; font-family: inherit; }
-  .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-  .stat-card { background: rgba(255,255,255,.15); border-radius: 10px; padding: 8px 10px; text-align: center; }
-  .stat-val { font-size: 20px; font-weight: 700; }
-  .stat-lbl { font-size: 11px; opacity: .8; }
+  .stat-card { border-radius: 10px; padding: 7px 12px; text-align: center; flex-shrink: 0; cursor: pointer; transition: opacity .15s; }
+  .stat-card:hover { opacity: .85; }
+  .stat-val { font-size: 18px; font-weight: 700; }
+  .stat-lbl { font-size: 10px; opacity: .85; white-space: nowrap; }
 
   /* TABS */
   .tabs { display: flex; background: var(--white); border-bottom: 2px solid var(--gray2); position: sticky; top: 128px; z-index: 19; }
@@ -223,11 +223,10 @@
       </div>
       <button class="header-logout" id="btn-logout">Çıkış</button>
     </div>
-    <div class="stats-row">
-      <div class="stat-card"><div class="stat-val" id="stat-hives">0</div><div class="stat-lbl">Kovan</div></div>
-      <div class="stat-card"><div class="stat-val" id="stat-honey">0</div><div class="stat-lbl">kg Bal</div></div>
-      <div class="stat-card"><div class="stat-val" id="stat-tasks">0</div><div class="stat-lbl">Bekleyen</div></div>
-    </div>
+    <!-- Üst satır: Tipler (sarı) -->
+    <div id="stats-tipler" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:6px;scrollbar-width:none"></div>
+    <!-- Alt satır: Gruplar (lacivert) -->
+    <div id="stats-gruplar" style="display:flex;gap:6px;overflow-x:auto;scrollbar-width:none"></div>
   </div>
 
   <!-- Tabs -->
@@ -279,15 +278,21 @@
 
         <!-- Uygulama Formu -->
         <div class="field"><label>Tür *</label>
-          <select class="input" id="toplu-type">
+          <select class="input" id="toplu-type" onchange="topluTurDegisti()">
             <option value="ilaçlama">💊 İlaçlama</option>
             <option value="besleme">🍬 Besleme</option>
             <option value="muayene">🔍 Muayene</option>
             <option value="hasat">🍯 Hasat</option>
+            <option value="cita">🔲 Çıta Ekle</option>
           </select>
         </div>
-        <div class="field"><label>İlaç / Ürün / Başlık *</label>
+        <div class="field" id="toplu-drug-field"><label>İlaç / Ürün / Başlık *</label>
           <input class="input" id="toplu-drug" placeholder="Formik asit, Oxalic asit...">
+        </div>
+        <div class="field" id="toplu-cita-field" style="display:none">
+          <label>Eklenecek Çıta Sayısı *</label>
+          <input class="input" id="toplu-cita-sayi" type="number" min="1" max="20" placeholder="1">
+          <div style="font-size:12px;color:var(--amber);margin-top:4px">En üst kata eklenir</div>
         </div>
         <div class="field"><label>Tarih *</label>
           <input class="input" id="toplu-date" type="date">
@@ -744,9 +749,47 @@ function loadRecords() {
 
 // ─── STATS ──────────────────────────────────────────────────────
 function updateStats() {
-  $("stat-hives").textContent = hives.length;
-  $("stat-honey").textContent = hives.reduce((s,h) => s + (Number(h.honey)||0), 0);
-  $("stat-tasks").textContent = schedules.filter(s => !s.done).length;
+  // ── Tipler satırı (sarı) ──
+  const tipler = getTipler();
+  const tiplerEl = $("stats-tipler");
+  if (tiplerEl) {
+    // Toplam kovan her zaman ilk
+    let html = `<div class="stat-card" style="background:rgba(255,255,255,.2);color:#fff" onclick="activeGrupFilter=null;switchTab('hives')">
+      <div class="stat-val">${hives.length}</div><div class="stat-lbl">Toplam</div>
+    </div>`;
+    tipler.forEach(tip => {
+      const sayi = hives.filter(h => h.type === tip).length;
+      if (sayi > 0) html += `<div class="stat-card" style="background:#FCD34D;color:#78350F" onclick="filterByType('${tip}')">
+        <div class="stat-val">${sayi}</div><div class="stat-lbl">${tip}</div>
+      </div>`;
+    });
+    // Bekleyen görev
+    const bekleyen = schedules.filter(s => !s.done).length;
+    html += `<div class="stat-card" style="background:rgba(255,255,255,.15);color:#fff">
+      <div class="stat-val">${bekleyen}</div><div class="stat-lbl">Bekleyen</div>
+    </div>`;
+    tiplerEl.innerHTML = html;
+  }
+
+  // ── Gruplar satırı (lacivert) ──
+  const gruplar = getGruplar();
+  const gruplarEl = $("stats-gruplar");
+  if (gruplarEl && gruplar.length) {
+    let html = "";
+    gruplar.forEach(g => {
+      const sayi = hives.filter(h => h.group === g.id).length;
+      if (sayi > 0) html += `<div class="stat-card" style="background:#1E3A5F;color:#93C5FD" onclick="homeGrupAc('${g.id}')">
+        <div class="stat-val">${sayi}</div><div class="stat-lbl">${g.ad}</div>
+      </div>`;
+    });
+    const grupsuz = hives.filter(h => !h.group).length;
+    if (grupsuz > 0) html += `<div class="stat-card" style="background:#1E3A5F;color:#93C5FD" onclick="homeGrupAc('__grupsuz__')">
+      <div class="stat-val">${grupsuz}</div><div class="stat-lbl">Grupsuz</div>
+    </div>`;
+    gruplarEl.innerHTML = html;
+  } else if (gruplarEl) {
+    gruplarEl.innerHTML = "";
+  }
 }
 
 // ─── RENDER HIVES ───────────────────────────────────────────────
@@ -1291,11 +1334,11 @@ function renderKatCitaText(h) {
         <div style="display:flex;flex-wrap:nowrap;gap:1px;overflow:hidden">
           ${Array.from({length: cita}).map(() => HEX()).join("")}
         </div>
-        <span style="font-size:9px;color:var(--gray);white-space:nowrap">${cita}ç</span>
+        <span style="font-size:9px;color:var(--gray);white-space:nowrap">${cita} çıta</span>
       </div>`;
     }).join("") +
     `<div style="font-size:10px;color:var(--brown2);font-weight:700;border-top:1px dashed var(--gray2);padding-top:3px;margin-top:1px">
-      Toplam: ${toplam}ç
+      Toplam: ${toplam} çıta
     </div>` +
   `</div>`;
 }
@@ -1608,12 +1651,25 @@ let activeGrupFilter = null;
 // ─── TOPLU UYGULAMA ──────────────────────────────────────────────
 let topluSeciliKovanlar = new Set();
 
+function topluTurDegisti() {
+  const tur = $("toplu-type").value;
+  const isCita = tur === "cita";
+  $("toplu-drug-field").style.display = isCita ? "none" : "";
+  $("toplu-cita-field").style.display = isCita ? "" : "none";
+  // Tekrar hatırlatıcısı çıta için anlamsız, gizle
+  const repeatField = $("toplu-repeat-check")?.closest?.(".field") || $("toplu-repeat-check")?.parentElement;
+  if (repeatField) repeatField.style.display = isCita ? "none" : "";
+}
+window.topluTurDegisti = topluTurDegisti;
+
 function toggleTopluPanel() {
   const panel = $("toplu-panel");
   const open = panel.style.display !== "none";
   panel.style.display = open ? "none" : "block";
   if (!open) {
     $("toplu-date").value = today();
+    $("toplu-type").value = "ilaçlama";
+    topluTurDegisti();
     topluSeciliKovanlar = new Set();
     renderTopluHiveList();
     renderTopluMiniKroki();
@@ -1720,6 +1776,33 @@ function topluSiraFiltrele() {
 }
 
 async function topluKaydet() {
+  const type = $("toplu-type").value;
+
+  // Çıta ekleme işlemi
+  if (type === "cita") {
+    const sayi = parseInt($("toplu-cita-sayi").value);
+    if (!sayi || sayi < 1) { showToast("Çıta sayısı gerekli"); return; }
+    if (!topluSeciliKovanlar.size) { showToast("En az bir kovan seç"); return; }
+    const batch = [];
+    topluSeciliKovanlar.forEach(hiveId => {
+      const hive = hives.find(h => h.id === hiveId);
+      if (!hive) return;
+      const floors = hive.floors || 1;
+      const def = getFramesPerFloor();
+      let kats = Array.isArray(hive.frames) ? [...hive.frames] :
+        typeof hive.frames === "number" ? [hive.frames] :
+        Array.from({length: floors}).map(() => def);
+      while (kats.length < floors) kats.push(def);
+      // En üst kata ekle (son index = en üst kat)
+      kats[kats.length - 1] = (kats[kats.length - 1] || 0) + sayi;
+      batch.push(updateDoc(doc(db, `users/${currentUser.uid}/kovanllar/${hiveId}`), { frames: kats }));
+    });
+    await Promise.all(batch);
+    showToast(`✓ ${topluSeciliKovanlar.size} kovana ${sayi} çıta eklendi`);
+    toggleTopluPanel();
+    return;
+  }
+
   const drug = $("toplu-drug").value.trim();
   const date = $("toplu-date").value;
   if (!drug || !date) { showToast("Başlık ve tarih gerekli"); return; }
@@ -2001,6 +2084,37 @@ window.testSil = testSil;
 
 // ─── GLOBAL EXPOSE ──────────────────────────────────────────────
 function temizleGrupFilter() { activeGrupFilter = null; renderHives(); }
+function filterByType(tip) {
+  activeGrupFilter = null;
+  switchTab("hives");
+  // Geçici tip filtresi — kovanlar listesini tipe göre filtrele
+  const el = $("hives-list");
+  const filtered = hives.filter(h => h.type === tip);
+  if (!filtered.length) return;
+  const filterHeader = `<div style="display:flex;align-items:center;gap:8px;background:var(--amber4);border-radius:10px;padding:8px 12px;margin-bottom:10px;font-size:13px">
+    <span style="flex:1;font-weight:600;color:var(--brown)">🏠 ${tip}</span>
+    <button onclick="renderHives()" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--gray)">✕</button>
+  </div>`;
+  // Geçici render
+  const dots = (h) => Array.from({length:10}).map((_,i) => `<div class="dot" style="background:${i < h.strength ? "#F59E0B" : "#E5E7EB"}"></div>`).join("");
+  el.innerHTML = filterHeader + filtered.map(h => {
+    const tasks = schedules.filter(s => s.hiveId === h.id && !s.done).length;
+    return `<div class="card" onclick="selectHive('${h.id}')">
+      <div class="card-header">
+        <div class="hex-icon" style="background:${h.color||"#F59E0B"}">🐝</div>
+        <div><div class="card-title">${h.name}</div>
+        <div class="card-sub">${h.queen||""} ${h.breed?"· "+h.breed:""}</div></div>
+        ${tasks > 0 ? `<span class="badge badge-amber">${tasks} görev</span>` : ""}
+      </div>
+      <div style="margin:8px 0 6px">${renderKatCitaText(h)}</div>
+      <div class="card-meta">
+        <div><div class="card-sub">${h.type||""} ${h.location?"· "+h.location:""}</div></div>
+        ${h.honey > 0 ? `<div style="text-align:right"><div class="card-meta-item">🍯 Bal</div><div class="card-meta-val">${h.honey} kg</div></div>` : ""}
+      </div>
+    </div>`;
+  }).join("");
+}
+window.filterByType = filterByType;
 window.temizleGrupFilter = temizleGrupFilter;
 window.renderKatCitaFields = renderKatCitaFields;
 window.tipEkle = tipEkle;
