@@ -418,6 +418,7 @@
       <div class="range-wrap"><input type="range" id="hive-strength" min="1" max="10" value="5"><span class="range-val" id="hive-strength-val">5</span></div>
     </div>
     <div class="field"><label>Kat Sayısı</label><select class="input" id="hive-floors"><option value="1">1 Kat</option><option value="2">2 Kat</option><option value="3">3 Kat</option></select></div>
+    <div class="field"><label>Çıta Sayısı</label><input class="input" id="hive-frames" type="number" min="1" max="50" placeholder="10"></div>
     <div class="field"><label>Bal (kg)</label><input class="input" id="hive-honey" type="number" min="0" placeholder="0"></div>
     <div class="field">
       <label>Renk</label>
@@ -657,7 +658,7 @@ function renderHives() {
         </div>
         <div style="text-align:right">
           <div class="card-meta-item">🏠 Kat / Çıta</div>
-          <div class="card-meta-val">${h.floors||1} kat · ${(h.floors||1)*getFramesPerFloor()} çıta</div>
+          <div class="card-meta-val">${h.floors||1} kat · ${h.frames || (h.floors||1)*getFramesPerFloor()} çıta</div>
         </div>
         <div style="text-align:right">
           <div class="card-meta-item">🍯 Bal</div>
@@ -710,6 +711,7 @@ window.editHive = function(id) {
   updatePosLabel();
   renderMiniGrid();
   $("hive-floors").value = h.floors||1;
+  $("hive-frames").value = h.frames||"";
   $("hive-honey").value = h.honey||0;
   $("hive-notes").value = h.notes||"";
   renderColorPicker(h.color||HIVE_COLORS[0]);
@@ -833,6 +835,7 @@ $("hive-save").onclick = async () => {
     strength: Number($("hive-strength").value),
     pos: selectedPos,
     floors: Number($("hive-floors").value||1),
+    frames: Number($("hive-frames").value||0),
     honey: Number($("hive-honey").value||0),
     notes: $("hive-notes").value.trim(),
     color: selectedColor,
@@ -926,6 +929,7 @@ $("fab-btn").onclick = () => {
     $("hive-type").value = "Langstroth";
     $("hive-strength").value = 5; $("hive-strength-val").textContent = 5;
     selectedPos = null;
+    $("hive-frames").value = "";
     updatePosLabel();
     renderMiniGrid();
     renderColorPicker(HIVE_COLORS[0]);
@@ -1112,7 +1116,7 @@ function renderTopluHiveList() {
         style="accent-color:var(--amber);width:17px;height:17px;flex-shrink:0">
       <div class="hex-icon" style="background:${h.color||"#F59E0B"};width:28px;height:24px;font-size:12px;flex-shrink:0">🐝</div>
       <span style="font-size:13px;font-weight:600;color:var(--brown);flex:1">${h.name}</span>
-      <span style="font-size:11px;color:var(--gray)">${h.floors||1}k · ${(h.floors||1)*getFramesPerFloor()}ç</span>
+      <span style="font-size:11px;color:var(--gray)">${h.floors||1}k · ${h.frames||(h.floors||1)*getFramesPerFloor()}ç</span>
     </label>`;
   }).join("");
 }
