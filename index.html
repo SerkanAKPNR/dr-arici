@@ -752,7 +752,7 @@ function renderHives() {
         <div class="hex-icon" style="background:${h.color||'#F59E0B'}">🐝</div>
         <div>
           <div class="card-title">${h.name}</div>
-          <div class="card-sub">${h.type||''} ${h.location ? '· '+h.location : ''}</div>
+          <div class="card-sub">${h.queen||''} ${h.breed ? '· '+h.breed : ''}</div>
         </div>
         ${tasks > 0 ? `<span class="badge badge-amber">${tasks} görev</span>` : ''}
       </div>
@@ -761,19 +761,17 @@ function renderHives() {
       </div>
       <div class="card-meta">
         <div style="text-align:left">
-          <div class="card-meta-item">Kraliçe</div>
-          <div class="card-meta-val">${h.queen||'—'} ${h.breed ? '· '+h.breed : ''}</div>
+          <div class="card-meta-val" style="font-size:12px;color:var(--gray)">${h.type||''} ${h.location ? '· '+h.location : ''}</div>
         </div>
-        <div style="text-align:right">
+        ${h.honey > 0 ? `<div style="text-align:right">
           <div class="card-meta-item">🍯 Bal</div>
-          <div class="card-meta-val">${h.honey||0} kg</div>
-        </div>
+          <div class="card-meta-val">${h.honey} kg</div>
+        </div>` : ''}
       </div>
       ${h.notes ? `<div style="margin-top:8px;font-size:12px;color:var(--gray);border-top:1px dashed var(--gray2);padding-top:8px">${h.notes}</div>` : ''}
       <div style="margin-top:10px;display:flex;gap:8px">
         <button onclick="event.stopPropagation();editHive('${h.id}')" style="flex:1;padding:7px;border:1px solid var(--gray2);border-radius:8px;background:var(--white);cursor:pointer;font-size:12px">✏️ Düzenle</button>
         <button onclick="event.stopPropagation();kovanIslemModal('${h.id}')" style="flex:1;padding:7px;border:1px solid #FEE2E2;border-radius:8px;background:#FFF5F5;cursor:pointer;font-size:12px;color:var(--red)">⬇️ İşlem</button>
-        <button onclick="event.stopPropagation();testSil('${h.id}')" style="padding:7px 10px;border:1px solid var(--gray2);border-radius:8px;background:var(--white);cursor:pointer;font-size:12px;color:var(--gray)" title="Test Sil — kalıcı, geçmişe gitmez, numara serbest kalır">🧹</button>
       </div>
     </div>`;
   }).join("");
@@ -1398,7 +1396,7 @@ window.kovanIslemModal = function(id) {
       </button>
       <button onclick="kovanIslemOnayla('${id}','silindi')"
         style="width:100%;padding:13px;background:var(--gray);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">
-        🗑️ Sil (Hatalı Giriş)
+        🗑️ Kalıcı Sil
       </button>
       <button onclick="closeModal('modal-kovan-islem')"
         style="width:100%;padding:11px;background:none;border:1.5px solid var(--gray2);border-radius:10px;font-size:14px;cursor:pointer;font-family:inherit;color:var(--brown2)">
@@ -1415,7 +1413,7 @@ window.kovanIslemOnayla = function(id, durum) {
   const mesajlar = {
     satildi: `${hive.name}. Kovan satıldı olarak işaretlenecek ve geçmişe taşınacak.`,
     "söndü": `${hive.name}. Kovan söndü olarak işaretlenecek ve geçmişe taşınacak.`,
-    silindi: `${hive.name}. Kovan silinecek. Bu işlem geri alınamaz!`,
+    silindi: `${hive.name}. Kovan kalıcı olarak silinecek!\n\nGeçmişe gitmez, numara serbest kalır. Bu işlem geri alınamaz!`,
   };
   if (!confirm(`⚠️ ONAY
 
