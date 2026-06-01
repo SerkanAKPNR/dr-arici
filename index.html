@@ -151,9 +151,10 @@
   .btn-row { display: flex; gap: 10px; margin-top: 6px; }
   .btn-row .btn { flex: 1; }
   .btn-outline { background: var(--white); border: 1.5px solid var(--gray2); color: var(--brown2); }
-  .color-picker { display: flex; gap: 8px; flex-wrap: wrap; }
-  .color-swatch { width: 28px; height: 28px; border-radius: 50%; cursor: pointer; border: 2.5px solid transparent; transition: border-color .15s; }
-  .color-swatch.active { border-color: var(--brown); }
+  .color-picker { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; }
+  .color-swatch { width: 100%; aspect-ratio: 1; border-radius: 8px; cursor: pointer; border: 2.5px solid transparent; transition: all .15s; }
+  .color-swatch:hover { transform: scale(1.15); }
+  .color-swatch.active { border-color: var(--brown); box-shadow: 0 0 0 2px var(--brown); }
   .range-wrap { display: flex; align-items: center; gap: 10px; }
   .range-wrap input[type=range] { flex: 1; accent-color: var(--amber2); }
   .range-val { font-weight: 700; color: var(--amber); min-width: 20px; text-align: center; }
@@ -609,7 +610,24 @@ function getNextHiveNumber() {
   return n;
 }
 
-const HIVE_COLORS = ["#F59E0B","#D97706","#B45309","#92400E","#78350F","#16A34A","#0F766E","#1D4ED8"];
+const HIVE_COLORS = [
+  // Sarı/Turuncu/Amber
+  "#FCD34D","#F59E0B","#D97706","#B45309",
+  // Kahve/Toprak
+  "#92400E","#78350F","#57534E","#44403C",
+  // Yeşil
+  "#4ADE80","#16A34A","#166534","#14532D",
+  // Mavi
+  "#60A5FA","#2563EB","#1D4ED8","#1E3A5F",
+  // Kırmızı/Pembe
+  "#F87171","#DC2626","#9F1239","#831843",
+  // Mor
+  "#C084FC","#9333EA","#7E22CE","#581C87",
+  // Cyan/Teal
+  "#22D3EE","#0891B2","#0F766E","#134E4A",
+  // Gri
+  "#9CA3AF","#6B7280","#374151","#111827",
+];
 
 // ─── UTILS ──────────────────────────────────────────────────────
 function $(id) { return document.getElementById(id); }
