@@ -914,19 +914,25 @@ window.editHive = function(id) {
 window.deleteHive = async function(id, durum, not) {
   const hive = hives.find(h => h.id === id);
   if (!hive) return;
-  // Numarayı yasaklılar listesine ekle
   const num = parseInt(hive.name);
-  if (num > 0) addBannedNumber(num);
-  // Geçmiş kaydı oluştur
-  await addDoc(col("kovan_gecmis"), {
-    ...hive,
-    arsivDurum: durum, // "satildi" | "sondü" | "silindi"
-    arsivNot: not || "",
-    arsivTarih: new Date().toISOString().split("T")[0],
-    arsivAt: serverTimestamp(),
-  });
-  await deleteDoc(doc(db, `users/${currentUser.uid}/kovanllar/${id}`));
-  showToast(durum === "satildi" ? "Kovan satıldı ✓" : durum === "söndü" ? "Kovan söndü olarak işaretlendi" : "Kovan silindi");
+
+  if (durum === "silindi") {
+    // Kalıcı sil: geçmişe gitme, numara serbest kalsın
+    await deleteDoc(doc(db, `users/${currentUser.uid}/kovanllar/${id}`));
+    showToast("Kovan kalıcı silindi ✓");
+  } else {
+    // Satıldı / Söndü: geçmişe taşı, numarayı yasakla
+    if (num > 0) addBannedNumber(num);
+    await addDoc(col("kovan_gecmis"), {
+      ...hive,
+      arsivDurum: durum,
+      arsivNot: not || "",
+      arsivTarih: new Date().toISOString().split("T")[0],
+      arsivAt: serverTimestamp(),
+    });
+    await deleteDoc(doc(db, `users/${currentUser.uid}/kovanllar/${id}`));
+    showToast(durum === "satildi" ? "Kovan satıldı ✓" : "Kovan söndü olarak işaretlendi");
+  }
   loadAll();
 };
 
@@ -1431,7 +1437,15 @@ let kovanGecmis = [];
 function loadKovanGecmis() {
   if (_unsubGecmis) _unsubGecmis();
   _unsubGecmis = onSnapshot(query(col("kovan_gecmis"), orderBy("arsivAt", "desc")), snap => {
-    kovanGecmis = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // Yanlışlıkla geçmişe girmiş "silindi" kayıtlarını temizle
+    snap.docs.forEach(d => {
+      if (d.data().arsivDurum === "silindi") {
+        deleteDoc(doc(db, `users/${currentUser.uid}/kovan_gecmis/${d.id}`));
+      }
+    });
+    kovanGecmis = snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(k => k.arsivDurum !== "silindi");
     renderGecmis();
   });
 }
