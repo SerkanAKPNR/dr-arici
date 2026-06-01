@@ -443,6 +443,12 @@
       <div id="hive-name-hint" style="font-size:12px;color:var(--amber);margin-top:4px"></div>
     </div>
     <div class="field"><label>Lokasyon</label><input class="input" id="hive-loc" placeholder="Bahçe, çayır..."></div>
+    <div class="field">
+      <label>Köken Kovan <span style="font-size:11px;color:var(--gray);font-weight:400">(opsiyonel — bölünme, aktarma vs.)</span></label>
+      <select class="input" id="hive-origin">
+        <option value="">— Yok</option>
+      </select>
+    </div>
     <div class="field"><label>Grup</label>
       <select class="input" id="hive-group">
         <option value="">— Grup yok</option>
@@ -857,6 +863,7 @@ function renderHives() {
           <div class="card-meta-val">${h.honey} kg</div>
         </div>` : ''}
       </div>
+      ${h.originHiveId ? `<div style="margin-top:6px;font-size:12px;color:var(--amber);font-weight:600">🔀 Köken: ${hives.find(x=>x.id===h.originHiveId)?.name||'?'}. Kovan</div>` : ''}
       ${h.notes ? `<div style="margin-top:8px;font-size:12px;color:var(--gray);border-top:1px dashed var(--gray2);padding-top:8px">${h.notes}</div>` : ''}
       <div style="margin-top:10px;display:flex;gap:8px">
         <button onclick="event.stopPropagation();editHive('${h.id}')" style="flex:1;padding:7px;border:1px solid var(--gray2);border-radius:8px;background:var(--white);cursor:pointer;font-size:12px">✏️ Düzenle</button>
@@ -894,6 +901,7 @@ window.editHive = function(id) {
   $("hive-modal-title").textContent = "✏️ Kovan Düzenle";
   $("hive-name").value = h.name||"";
   $("hive-loc").value = h.location||"";
+  populateHiveOriginSelect("hive-origin", h.originHiveId||"");
   populateGroupSelect("hive-group", h.group||"");
   populateHiveTypeSelect(h.type||"Langstroth");
   $("hive-breed").value = h.breed||"";
@@ -1053,6 +1061,7 @@ $("hive-save").onclick = async () => {
   const data = {
     name, location: $("hive-loc").value.trim(),
     group: $("hive-group").value || null,
+    originHiveId: $("hive-origin").value || null,
     type: $("hive-type").value,
     breed: $("hive-breed").value.trim(),
     queen: $("hive-queen").value,
@@ -1157,6 +1166,7 @@ $("fab-btn").onclick = () => {
     editingHiveId = null;
     $("hive-modal-title").textContent = "🐝 Yeni Kovan";
     ["hive-loc","hive-breed","hive-queen","hive-honey","hive-notes"].forEach(id => $(id).value = "");
+    populateHiveOriginSelect("hive-origin", "");
     populateGroupSelect("hive-group", "");
     const nextNum = getNextHiveNumber();
     $("hive-name").value = nextNum;
@@ -1577,6 +1587,13 @@ function renderGrupListesi() {
       <button onclick="grupSil('${g.id}')"
         style="background:none;border:none;color:var(--red);cursor:pointer;font-size:16px">🗑️</button>
     </div>`).join("");
+}
+
+function populateHiveOriginSelect(elId, selected) {
+  const sel = $(elId);
+  if (!sel) return;
+  sel.innerHTML = `<option value="">— Yok</option>` +
+    hives.map(h => `<option value="${h.id}" ${h.id===selected?'selected':''}>${h.name}. Kovan</option>`).join("");
 }
 
 function populateGroupSelect(elId, selected) {
