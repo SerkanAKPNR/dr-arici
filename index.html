@@ -401,7 +401,11 @@
   <div class="modal">
     <div class="modal-handle"></div>
     <div class="modal-title" id="hive-modal-title">🐝 Yeni Kovan</div>
-    <div class="field"><label>Kovan Adı *</label><input class="input" id="hive-name" placeholder="Kovan 1"></div>
+    <div class="field">
+      <label>Kovan Numarası *</label>
+      <input class="input" id="hive-name" type="number" min="1" placeholder="1">
+      <div id="hive-name-hint" style="font-size:12px;color:var(--amber);margin-top:4px"></div>
+    </div>
     <div class="field"><label>Lokasyon</label><input class="input" id="hive-loc" placeholder="Bahçe, çayır..."></div>
     <div class="field"><label>Kovan Tipi</label>
       <select class="input" id="hive-type">
@@ -477,6 +481,12 @@
     <div class="field"><label>Kovan *</label>
       <select class="input" id="rec-hive"></select>
     </div>
+    <div class="field">
+      <label>Köken Kovan <span style="font-size:11px;color:var(--gray);font-weight:400">(opsiyonel — bölünme, aktarma vs.)</span></label>
+      <select class="input" id="rec-origin">
+        <option value="">— Yok</option>
+      </select>
+    </div>
     <div class="field"><label>Tarih *</label><input class="input" id="rec-date" type="date"></div>
     <div class="field"><label>Gözlem / Not *</label><textarea class="input" id="rec-note" placeholder="Kraliçe görüldü, varroa sayısı, bal durumu..."></textarea></div>
     <div class="field"><label>Kışlatma Notu</label><input class="input" id="rec-winter" placeholder="Opsiyonel..."></div>
@@ -536,6 +546,23 @@ let activeTab = "hives";
 let selectedHiveId = null;
 let schedFilter = "all";
 let editingHiveId = null;
+
+// ─── KOVAN NUMARALAMA ────────────────────────────────────────────
+function getBannedNumbers() {
+  try { return JSON.parse(localStorage.getItem("banned_hive_numbers") || "[]"); } catch(e) { return []; }
+}
+function addBannedNumber(num) {
+  const list = getBannedNumbers();
+  if (!list.includes(num)) { list.push(num); localStorage.setItem("banned_hive_numbers", JSON.stringify(list)); }
+}
+function getNextHiveNumber() {
+  const used = hives.map(h => parseInt(h.name)).filter(n => !isNaN(n));
+  const banned = getBannedNumbers();
+  const all = [...used, ...banned];
+  let n = 1;
+  while (all.includes(n)) n++;
+  return n;
+}
 
 const HIVE_COLORS = ["#F59E0B","#D97706","#B45309","#92400E","#78350F","#16A34A","#0F766E","#1D4ED8"];
 
@@ -653,18 +680,13 @@ function renderHives() {
         </div>
         ${tasks > 0 ? `<span class="badge badge-amber">${tasks} görev</span>` : ''}
       </div>
+      <div style="margin:8px 0 6px">
+        ${renderKatCitaText(h)}
+      </div>
       <div class="card-meta">
-        <div>
-          <div class="card-meta-item">Koloni Gücü</div>
-          <div class="strength-dots">${dots}</div>
-        </div>
-        <div style="text-align:right">
+        <div style="text-align:left">
           <div class="card-meta-item">Kraliçe</div>
           <div class="card-meta-val">${h.queen||'—'} ${h.breed ? '· '+h.breed : ''}</div>
-        </div>
-        <div style="text-align:right">
-          <div class="card-meta-item">🏠 Kat / Çıta</div>
-          <div style="margin-top:2px">${renderKatCitaText(h)}</div>
         </div>
         <div style="text-align:right">
           <div class="card-meta-item">🍯 Bal</div>
@@ -726,6 +748,12 @@ window.editHive = function(id) {
 
 window.deleteHive = async function(id) {
   if (!confirm("Bu kovanı silmek istiyor musun?")) return;
+  // Numarayı yasaklılar listesine ekle
+  const hive = hives.find(h => h.id === id);
+  if (hive && hive.name) {
+    const num = parseInt(hive.name);
+    if (num > 0) addBannedNumber(num);
+  }
   await deleteDoc(doc(db, `users/${currentUser.uid}/kovanllar/${id}`));
   showToast("Kovan silindi");
   loadAll();
@@ -798,6 +826,9 @@ function renderRecords() {
         </div>
         <button onclick="deleteRecord('${r.id}')" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--gray)">🗑️</button>
       </div>
+      ${r.originHiveId ? `<div style="font-size:12px;color:var(--amber);font-weight:600;margin-bottom:6px">
+        🔀 Köken: ${hives.find(h=>h.id===r.originHiveId)?.name||'?'}. Kovan
+      </div>` : ''}
       <div style="font-size:14px;color:#374151;margin-bottom:${r.winter?'6px':'0'}">${r.note}</div>
       ${r.winter ? `<div style="font-size:12px;color:var(--gray);background:var(--cream2);padding:6px 10px;border-radius:8px">❄️ Kışlatma: ${r.winter}</div>` : ''}
     </div>`;
@@ -831,8 +862,17 @@ window.pickColor = function(c) {
 $("hive-strength").oninput = e => $("hive-strength-val").textContent = e.target.value;
 
 $("hive-save").onclick = async () => {
-  const name = $("hive-name").value.trim();
-  if (!name) { showToast("Kovan adı gerekli"); return; }
+  const nameRaw = $("hive-name").value.trim();
+  if (!nameRaw) { showToast("Kovan numarası gerekli"); return; }
+  const num = parseInt(nameRaw);
+  if (!num || num < 1) { showToast("Geçerli bir numara gir"); return; }
+  const name = String(num);
+  // Aynı numara kontrolü
+  const duplicate = hives.find(h => String(h.name) === name && h.id !== editingHiveId);
+  if (duplicate) { showToast("Bu numara zaten kullanılıyor!"); return; }
+  // Yasaklı numara kontrolü
+  const banned = getBannedNumbers();
+  if (!editingHiveId && banned.includes(num)) { showToast("Bu numara daha önce kullanılmış, verilemez!"); return; }
   const data = {
     name, location: $("hive-loc").value.trim(),
     type: $("hive-type").value,
@@ -867,6 +907,12 @@ function populateHiveSelects() {
     sel.innerHTML = hives.map(h => `<option value="${h.id}">${h.name}</option>`).join("");
     if (selectedHiveId) sel.value = selectedHiveId;
   });
+  // Köken kovan seçici
+  const recOrigin = $("rec-origin");
+  if (recOrigin) {
+    recOrigin.innerHTML = `<option value="">— Yok</option>` +
+      hives.map(h => `<option value="${h.id}">${h.name}</option>`).join("");
+  }
 }
 
 $("sched-save").onclick = async () => {
@@ -892,6 +938,7 @@ $("rec-save").onclick = async () => {
   if (!note || !date) { showToast("Tarih ve not gerekli"); return; }
   await addDoc(col("kayitlar"), {
     hiveId: $("rec-hive").value,
+    originHiveId: $("rec-origin").value || null,
     date, note,
     winter: $("rec-winter").value.trim(),
     createdAt: serverTimestamp(),
@@ -931,7 +978,11 @@ $("fab-btn").onclick = () => {
   if (activeTab === "hives") {
     editingHiveId = null;
     $("hive-modal-title").textContent = "🐝 Yeni Kovan";
-    ["hive-name","hive-loc","hive-breed","hive-queen","hive-honey","hive-notes"].forEach(id => $(id).value = "");
+    ["hive-loc","hive-breed","hive-queen","hive-honey","hive-notes"].forEach(id => $(id).value = "");
+    const nextNum = getNextHiveNumber();
+    $("hive-name").value = nextNum;
+    const hint = $("hive-name-hint");
+    if (hint) hint.textContent = "Önerilen numara: " + nextNum;
     $("hive-type").value = "Langstroth";
     $("hive-strength").value = 5; $("hive-strength-val").textContent = 5;
     selectedPos = null;
@@ -951,6 +1002,7 @@ $("fab-btn").onclick = () => {
     populateHiveSelects();
     $("rec-date").value = today();
     $("rec-note").value = ""; $("rec-winter").value = "";
+    $("rec-origin").value = "";
     openModal("modal-rec");
   }
 };
@@ -1092,27 +1144,33 @@ function renderKatCitaText(h) {
   const floors = h.floors || 1;
   const frames = h.frames;
   const def = getFramesPerFloor();
-  // Her kat için çıta sayısı dizisi
   let kats = [];
   if (Array.isArray(frames)) kats = frames;
   else if (typeof frames === "number" && frames > 0) kats = [frames];
   else kats = Array.from({length: floors}).map(() => def);
-  // Eksik katları doldur
   while (kats.length < floors) kats.push(def);
 
-  // Görsel: her kat bir satır, alttan üste, hex ikonlar
-  const maxCita = Math.max(...kats, 1);
-  const rows = kats.slice().reverse(); // üst kat önce
-  return rows.map((cita, ri) => {
-    const katNo = floors - ri;
-    const dots = Array.from({length: cita}).map((_, i) =>
-      `<span style="display:inline-block;width:10px;height:9px;clip-path:polygon(25% 0%,75% 0%,100% 50%,75% 100%,25% 100%,0% 50%);background:#F59E0B;margin:0 1px"></span>`
-    ).join("");
-    return `<div style="display:flex;align-items:center;gap:4px;margin-bottom:2px">
-      <span style="font-size:9px;color:var(--gray);min-width:14px">${katNo}.</span>
-      <div style="display:flex;flex-wrap:wrap;gap:1px">${dots}</div>
-    </div>`;
-  }).join("");
+  const toplam = kats.reduce((s, c) => s + c, 0);
+
+  const HEX = () =>
+    `<span style="display:inline-block;width:9px;height:8px;
+      clip-path:polygon(25% 0%,75% 0%,100% 50%,75% 100%,25% 100%,0% 50%);
+      background:#F59E0B;margin:0 1px"></span>`;
+
+  return `<div style="display:flex;flex-direction:column;gap:3px">` +
+    kats.map((cita, i) =>
+      `<div style="display:flex;align-items:center;gap:4px">
+        <span style="font-size:9px;color:var(--gray);min-width:14px;font-weight:600">${i+1}.</span>
+        <div style="display:flex;flex-wrap:nowrap;gap:1px;overflow:hidden">
+          ${Array.from({length: cita}).map(() => HEX()).join("")}
+        </div>
+        <span style="font-size:9px;color:var(--gray);white-space:nowrap">${cita}ç</span>
+      </div>`
+    ).join("") +
+    `<div style="font-size:10px;color:var(--brown2);font-weight:700;border-top:1px dashed var(--gray2);padding-top:3px;margin-top:1px">
+      Toplam: ${toplam}ç
+    </div>` +
+  `</div>`;
 }
 
 function saveFramesSetting() {
