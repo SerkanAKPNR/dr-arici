@@ -1046,13 +1046,14 @@ $("fab-btn").onclick = () => {
     const hint = $("hive-name-hint");
     if (hint) hint.textContent = "Önerilen numara: " + nextNum;
     $("hive-type").value = "Langstroth";
+    $("hive-floors").value = "1";
     $("hive-strength").value = 5; $("hive-strength-val").textContent = 5;
     selectedPos = null;
-    renderKatCitaFields();
     updatePosLabel();
     renderMiniGrid();
     renderColorPicker(HIVE_COLORS[0]);
     openModal("modal-hive");
+    setTimeout(() => renderKatCitaFields(), 50);
   } else if (activeTab === "kroki" || activeTab === "settings") {
     return;
   } else if (activeTab === "schedule") {
