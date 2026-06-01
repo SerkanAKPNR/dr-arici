@@ -555,7 +555,7 @@ import {
   signOut, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import {
-  getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc,
+  getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, setDoc,
   doc, query, where, orderBy, onSnapshot, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
@@ -593,7 +593,7 @@ function getBannedNumbers() {
 }
 function addBannedNumber(num) {
   const list = getBannedNumbers();
-  if (!list.includes(num)) { list.push(num); localStorage.setItem("banned_hive_numbers", JSON.stringify(list)); }
+  if (!list.includes(num)) { list.push(num); localStorage.setItem("banned_hive_numbers", JSON.stringify(list)); saveAyarlarToFirestore(); }
 }
 function getNextHiveNumber() {
   const used = hives.map(h => parseInt(h.name)).filter(n => !isNaN(n));
@@ -639,6 +639,7 @@ $("btn-register").onclick = async () => {
   } catch(err) { showAuthError(err.code); }
 };
 $("btn-logout").onclick = () => {
+  if (_unsubAyarlar) _unsubAyarlar();
   if (_unsubHives) _unsubHives();
   if (_unsubSchedules) _unsubSchedules();
   if (_unsubRecords) _unsubRecords();
@@ -676,10 +677,41 @@ onAuthStateChanged(auth, async (user) => {
 const col = (name) => collection(db, `users/${currentUser.uid}/${name}`);
 
 function loadAll() {
+  loadAyarlar();
   loadHives();
   loadSchedules();
   loadRecords();
   loadKovanGecmis();
+}
+
+let _unsubAyarlar = null;
+function loadAyarlar() {
+  if (_unsubAyarlar) _unsubAyarlar();
+  const ayarDoc = doc(db, `users/${currentUser.uid}/ayarlar/genel`);
+  _unsubAyarlar = onSnapshot(ayarDoc, snap => {
+    if (snap.exists()) {
+      const d = snap.data();
+      if (d.gruplar) localStorage.setItem("arilık_gruplar", JSON.stringify(d.gruplar));
+      if (d.tipler) localStorage.setItem("kovan_tipleri", JSON.stringify(d.tipler));
+      if (d.bannedNumbers) localStorage.setItem("banned_hive_numbers", JSON.stringify(d.bannedNumbers));
+      if (d.framesPerFloor) localStorage.setItem("frames_per_floor", String(d.framesPerFloor));
+    }
+    // Render
+    if (document.getElementById("grup-listesi")) renderGrupListesi();
+    if (document.getElementById("tip-listesi")) renderTipListesi();
+    populateHiveTypeSelect();
+  });
+}
+
+async function saveAyarlarToFirestore() {
+  if (!currentUser || !db) return;
+  const ayarDoc = doc(db, `users/${currentUser.uid}/ayarlar/genel`);
+  await setDoc(ayarDoc, {
+    gruplar: getGruplar(),
+    tipler: getTipler(),
+    bannedNumbers: getBannedNumbers(),
+    framesPerFloor: getFramesPerFloor(),
+  }, { merge: true });
 }
 
 // Dinleyici referansları
@@ -752,7 +784,7 @@ function renderHives() {
         <div class="hex-icon" style="background:${h.color||'#F59E0B'}">🐝</div>
         <div>
           <div class="card-title">${h.name}</div>
-          <div class="card-sub" style="font-size:12px;color:var(--gray)">${h.queen||''} ${h.breed ? '· '+h.breed : ''}</div>
+          <div class="card-sub">${h.queen||''} ${h.breed ? '· '+h.breed : ''}</div>
         </div>
         ${tasks > 0 ? `<span class="badge badge-amber">${tasks} görev</span>` : ''}
       </div>
@@ -761,7 +793,7 @@ function renderHives() {
       </div>
       <div class="card-meta">
         <div style="text-align:left">
-          <div class="card-sub" style="font-size:12px;color:var(--gray)">${h.type||''} ${h.location ? '· '+h.location : ''}</div>
+          <div class="card-sub">${h.type||''} ${h.location ? '· '+h.location : ''}</div>
         </div>
         ${h.honey > 0 ? `<div style="text-align:right">
           <div class="card-meta-item">🍯 Bal</div>
@@ -1272,6 +1304,7 @@ function saveFramesSetting() {
   const val = parseInt($("set-frames").value);
   if (!val || val < 1) return;
   localStorage.setItem("frames_per_floor", val);
+  saveAyarlarToFirestore();
   showToast("Kaydedildi ✓ — " + val + " çıta/kat");
   renderHives();
 }
@@ -1292,6 +1325,7 @@ function getTipler() {
 
 function saveTipler(list) {
   localStorage.setItem("kovan_tipleri", JSON.stringify(list));
+  saveAyarlarToFirestore();
 }
 
 function tipEkle() {
@@ -1433,6 +1467,7 @@ function getGruplar() {
 }
 function saveGruplar(list) {
   localStorage.setItem("arilık_gruplar", JSON.stringify(list));
+  saveAyarlarToFirestore();
 }
 
 function grupEkle() {
@@ -1970,6 +2005,7 @@ window.temizleGrupFilter = temizleGrupFilter;
 window.renderKatCitaFields = renderKatCitaFields;
 window.tipEkle = tipEkle;
 window.tipSil = tipSil;
+window.saveAyarlarToFirestore = saveAyarlarToFirestore;
 window.applyTabOrder = applyTabOrder;
 window.getTabOrder = getTabOrder;
 window.renderTopluHiveList = renderTopluHiveList;
