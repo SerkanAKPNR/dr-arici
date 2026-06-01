@@ -393,6 +393,14 @@
   </div>
 </div>
 
+<!-- MODAL: Kovan Detay (Kroki) -->
+<div class="modal-overlay" id="modal-kovan-detay">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div id="kovan-detay-icerik"></div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <!-- Firebase SDK -->
@@ -422,6 +430,11 @@ const db = getFirestore(app);
 
 // ─── STATE ──────────────────────────────────────────────────────
 let currentUser = null;
+
+// Çıta ayarı — erken tanımla
+function getFramesPerFloor() {
+  return parseInt(localStorage.getItem('frames_per_floor') || '10');
+}
 let hives = [];
 let schedules = [];
 let records = [];
@@ -954,10 +967,6 @@ function renderSettings() {
   renderTabOrderList();
 }
 
-function getFramesPerFloor() {
-  return parseInt(localStorage.getItem("frames_per_floor") || "10");
-}
-
 function saveFramesSetting() {
   const val = parseInt($("set-frames").value);
   if (!val || val < 1) return;
@@ -1058,28 +1067,88 @@ window.selectPos = function(r, c) {
 };
 
 window.selectHiveFromKroki = function(id) {
-  selectedHiveId = selectedHiveId === id ? null : id;
-  renderHives();
-  updateDetailBanners();
-  renderSchedule();
-  renderRecords();
-  // Switch to hives tab
-  activeTab = "hives";
-  document.querySelectorAll(".tab").forEach(t => {
-    t.classList.toggle("active", t.dataset.tab === "hives");
-  });
-  $("tab-hives").style.display = "";
-  $("tab-schedule").style.display = "none";
-  $("tab-records").style.display = "none";
-  $("tab-kroki").style.display = "none";
-  $("tab-settings").style.display = "none";
+  const hive = hives.find(h => h.id === id);
+  if (!hive) return;
+  const tasks = schedules.filter(s => s.hiveId === id && !s.done).length;
+  const dots = Array.from({length:10}).map((_,i) =>
+    `<div class="dot" style="background:${i < hive.strength ? '#F59E0B' : '#E5E7EB'}"></div>`
+  ).join("");
+  const frames = (hive.floors||1) * getFramesPerFloor();
+  const overdue = schedules.filter(s => s.hiveId === id && !s.done && new Date(s.date) < new Date());
+  const upcoming = schedules.filter(s => s.hiveId === id && !s.done && new Date(s.date) >= new Date()).slice(0,3);
+
+  const tagMap = { ilaçlama:"tag-ilac", besleme:"tag-besle", muayene:"tag-muayene", hasat:"tag-hasat" };
+  const iconMap = { ilaçlama:"💊", besleme:"🍬", muayene:"🔍", hasat:"🍯" };
+
+  let schedHtml = '';
+  if (overdue.length) {
+    schedHtml += overdue.map(s => `
+      <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:#FEE2E2;border-radius:8px;margin-bottom:5px">
+        <span class="tag tag-ilac" style="font-size:11px">${iconMap[s.type]||''} ${s.type}</span>
+        <span style="font-size:13px;font-weight:600;color:var(--brown);flex:1">${s.drug}</span>
+        <span style="font-size:11px;color:var(--red);font-weight:700">Gecikmiş!</span>
+      </div>`).join('');
+  }
+  if (upcoming.length) {
+    schedHtml += upcoming.map(s => `
+      <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--amber4);border-radius:8px;margin-bottom:5px">
+        <span class="tag tag-ilac" style="font-size:11px">${iconMap[s.type]||''} ${s.type}</span>
+        <span style="font-size:13px;font-weight:600;color:var(--brown);flex:1">${s.drug}</span>
+        <span style="font-size:11px;color:var(--gray)">${new Date(s.date).toLocaleDateString('tr-TR',{day:'numeric',month:'short'})}</span>
+      </div>`).join('');
+  }
+  if (!schedHtml) schedHtml = '<div style="font-size:13px;color:var(--gray);padding:4px 0">Bekleyen görev yok ✓</div>';
+
+  $("kovan-detay-icerik").innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+      <div class="hex-icon" style="background:${hive.color||'#F59E0B'};width:44px;height:38px;font-size:18px">🐝</div>
+      <div style="flex:1">
+        <div style="font-family:'Playfair Display',serif;font-size:20px;color:var(--brown);font-weight:700">${hive.name}</div>
+        <div style="font-size:12px;color:var(--gray)">${hive.type||''} ${hive.location?'· '+hive.location:''}</div>
+      </div>
+      <button onclick="closeModal('modal-kovan-detay')" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--gray)">✕</button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+      <div style="background:var(--cream2);border-radius:10px;padding:10px 12px">
+        <div style="font-size:11px;color:var(--gray);margin-bottom:4px">Koloni Gücü</div>
+        <div class="strength-dots">${dots}</div>
+      </div>
+      <div style="background:var(--cream2);border-radius:10px;padding:10px 12px">
+        <div style="font-size:11px;color:var(--gray);margin-bottom:4px">Kraliçe</div>
+        <div style="font-weight:700;color:var(--brown)">${hive.queen||'—'} ${hive.breed?'· '+hive.breed:''}</div>
+      </div>
+      <div style="background:var(--cream2);border-radius:10px;padding:10px 12px">
+        <div style="font-size:11px;color:var(--gray);margin-bottom:4px">🏠 Kat / Çıta</div>
+        <div style="font-weight:700;color:var(--brown)">${hive.floors||1} kat · ${frames} çıta</div>
+      </div>
+      <div style="background:var(--cream2);border-radius:10px;padding:10px 12px">
+        <div style="font-size:11px;color:var(--gray);margin-bottom:4px">🍯 Bal</div>
+        <div style="font-weight:700;color:var(--amber)">${hive.honey||0} kg</div>
+      </div>
+    </div>
+
+    <div style="font-size:12px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">
+      Görevler ${tasks>0?`<span style="background:var(--amber);color:#fff;border-radius:20px;padding:1px 8px;font-size:11px">${tasks}</span>`:''}
+    </div>
+    ${schedHtml}
+    ${hive.notes?`<div style="margin-top:12px;font-size:13px;color:var(--gray);border-top:1px dashed var(--gray2);padding-top:10px">${hive.notes}</div>`:''}
+
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button onclick="closeModal('modal-kovan-detay');editHive('${hive.id}')"
+        style="flex:1;padding:10px;border:1px solid var(--gray2);border-radius:10px;background:var(--white);cursor:pointer;font-size:13px;font-family:inherit">✏️ Düzenle</button>
+      <button onclick="closeModal('modal-kovan-detay');selectedHiveId='${hive.id}';activeTab='schedule';applyTabOrder(getTabOrder())"
+        style="flex:1;padding:10px;border:none;border-radius:10px;background:var(--amber);color:#fff;cursor:pointer;font-size:13px;font-weight:700;font-family:inherit">📋 Takvim</button>
+    </div>
+  `;
+  openModal('modal-kovan-detay');
 };
 
 // Başlangıçta kayıtlı sekme sırası uygula
 applyTabOrder(getTabOrder());
 
 // Close modals on overlay click
-["modal-hive","modal-sched","modal-rec"].forEach(id => {
+["modal-hive","modal-sched","modal-rec","modal-kovan-detay"].forEach(id => {
   $(id).onclick = e => { if (e.target === $(id)) closeModal(id); };
 });
 </script>
