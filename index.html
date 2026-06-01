@@ -376,6 +376,16 @@
         <button onclick="saveTabOrder()" style="width:100%;margin-top:12px;padding:10px;background:var(--amber);color:#fff;border:none;border-radius:10px;font-weight:700;cursor:pointer;font-size:14px;font-family:inherit">Kaydet</button>
       </div>
 
+      <div class="sec-title">Kovan Tipleri</div>
+      <div style="background:var(--white);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow)">
+        <div id="tip-listesi" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px"></div>
+        <div style="display:flex;gap:8px">
+          <input id="yeni-tip-ad" class="input" placeholder="Kovan tipi adı..." style="flex:1;margin-bottom:0">
+          <button onclick="tipEkle()"
+            style="background:var(--amber);color:#fff;border:none;border-radius:8px;padding:0 16px;font-weight:700;cursor:pointer;font-size:20px;font-family:inherit">+</button>
+        </div>
+      </div>
+
       <div class="sec-title">Grup Yönetimi</div>
       <div style="background:var(--white);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow)">
         <div id="grup-listesi" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px"></div>
@@ -433,12 +443,7 @@
       </select>
     </div>
     <div class="field"><label>Kovan Tipi</label>
-      <select class="input" id="hive-type">
-        <option value="Langstroth">Langstroth</option>
-        <option value="Dadant">Dadant</option>
-        <option value="Yatay">Yatay</option>
-        <option value="Diğer">Diğer</option>
-      </select>
+      <select class="input" id="hive-type"></select>
     </div>
     <div class="field"><label>Kraliçe Irkı</label><input class="input" id="hive-breed" placeholder="Kafkas, Karniyol..."></div>
     <div class="field"><label>Kraliçe Yılı</label><input class="input" id="hive-queen" placeholder="2024" type="number" min="2015" max="2030"></div>
@@ -803,7 +808,7 @@ window.editHive = function(id) {
   $("hive-name").value = h.name||"";
   $("hive-loc").value = h.location||"";
   populateGroupSelect("hive-group", h.group||"");
-  $("hive-type").value = h.type||"Langstroth";
+  populateHiveTypeSelect(h.type||"Langstroth");
   $("hive-breed").value = h.breed||"";
   $("hive-queen").value = h.queen||"";
   $("hive-strength").value = h.strength||5;
@@ -1064,7 +1069,7 @@ $("fab-btn").onclick = () => {
     $("hive-name").value = nextNum;
     const hint = $("hive-name-hint");
     if (hint) hint.textContent = "Önerilen numara: " + nextNum;
-    $("hive-type").value = "Langstroth";
+    populateHiveTypeSelect("Langstroth");
     $("hive-floors").value = "1";
     $("hive-strength").value = 5; $("hive-strength-val").textContent = 5;
     selectedPos = null;
@@ -1202,6 +1207,7 @@ function renderSettings() {
   if (framesEl) framesEl.value = getFramesPerFloor();
   renderTabOrderList();
   renderGrupListesi();
+  renderTipListesi();
 }
 
 function renderKatCitaFields(existing) {
@@ -1271,6 +1277,61 @@ function saveFramesSetting() {
 
 
 
+
+
+// ─── KOVAN TİPLERİ ───────────────────────────────────────────────
+const VARSAYILAN_TIPLER = ["Langstroth", "Dadant", "Yatay", "Diğer"];
+
+function getTipler() {
+  try {
+    const saved = JSON.parse(localStorage.getItem("kovan_tipleri") || "null");
+    return saved || [...VARSAYILAN_TIPLER];
+  } catch(e) { return [...VARSAYILAN_TIPLER]; }
+}
+
+function saveTipler(list) {
+  localStorage.setItem("kovan_tipleri", JSON.stringify(list));
+}
+
+function tipEkle() {
+  const ad = $("yeni-tip-ad").value.trim();
+  if (!ad) { showToast("Tip adı gerekli"); return; }
+  const list = getTipler();
+  if (list.includes(ad)) { showToast("Bu tip zaten var"); return; }
+  list.push(ad);
+  saveTipler(list);
+  $("yeni-tip-ad").value = "";
+  renderTipListesi();
+  populateHiveTypeSelect();
+  showToast("Kovan tipi eklendi ✓");
+}
+
+function tipSil(tip) {
+  if (!confirm(`"${tip}" tipini silmek istiyor musun?`)) return;
+  const list = getTipler().filter(t => t !== tip);
+  saveTipler(list);
+  renderTipListesi();
+  populateHiveTypeSelect();
+  showToast("Tip silindi");
+}
+
+function renderTipListesi() {
+  const el = $("tip-listesi");
+  if (!el) return;
+  const list = getTipler();
+  el.innerHTML = list.map(t => `
+    <div style="display:flex;align-items:center;gap:10px;padding:7px 10px;background:var(--cream2);border-radius:8px">
+      <span style="flex:1;font-size:14px;color:var(--brown)">${t}</span>
+      <button onclick="tipSil('${t}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:15px">🗑️</button>
+    </div>`).join("");
+}
+
+function populateHiveTypeSelect(selected) {
+  const sel = $("hive-type");
+  if (!sel) return;
+  const list = getTipler();
+  sel.innerHTML = list.map(t => `<option value="${t}" ${t===(selected||"Langstroth")?"selected":""}>${t}</option>`).join("");
+}
 
 // ─── KOVAN GEÇMİŞİ & İŞLEM ──────────────────────────────────────
 let kovanGecmis = [];
@@ -1906,6 +1967,8 @@ window.testSil = testSil;
 function temizleGrupFilter() { activeGrupFilter = null; renderHives(); }
 window.temizleGrupFilter = temizleGrupFilter;
 window.renderKatCitaFields = renderKatCitaFields;
+window.tipEkle = tipEkle;
+window.tipSil = tipSil;
 window.applyTabOrder = applyTabOrder;
 window.getTabOrder = getTabOrder;
 window.renderTopluHiveList = renderTopluHiveList;
