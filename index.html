@@ -664,7 +664,7 @@ function renderHives() {
         </div>
         <div style="text-align:right">
           <div class="card-meta-item">🏠 Kat / Çıta</div>
-          <div class="card-meta-val" style="font-size:12px;line-height:1.6">${renderKatCitaText(h)}</div>
+          <div style="margin-top:2px">${renderKatCitaText(h)}</div>
         </div>
         <div style="text-align:right">
           <div class="card-meta-item">🍯 Bal</div>
@@ -1091,14 +1091,28 @@ function getKatCitaValues() {
 function renderKatCitaText(h) {
   const floors = h.floors || 1;
   const frames = h.frames;
-  if (Array.isArray(frames)) {
-    return frames.map((f, i) => `${i+1}.Kat: ${f}ç`).join(" · ");
-  } else if (typeof frames === "number" && frames > 0) {
-    return `1.Kat: ${frames}ç`;
-  }
-  // Varsayılan
   const def = getFramesPerFloor();
-  return Array.from({length: floors}).map((_, i) => `${i+1}.Kat: ${def}ç`).join(" · ");
+  // Her kat için çıta sayısı dizisi
+  let kats = [];
+  if (Array.isArray(frames)) kats = frames;
+  else if (typeof frames === "number" && frames > 0) kats = [frames];
+  else kats = Array.from({length: floors}).map(() => def);
+  // Eksik katları doldur
+  while (kats.length < floors) kats.push(def);
+
+  // Görsel: her kat bir satır, alttan üste, hex ikonlar
+  const maxCita = Math.max(...kats, 1);
+  const rows = kats.slice().reverse(); // üst kat önce
+  return rows.map((cita, ri) => {
+    const katNo = floors - ri;
+    const dots = Array.from({length: cita}).map((_, i) =>
+      `<span style="display:inline-block;width:10px;height:9px;clip-path:polygon(25% 0%,75% 0%,100% 50%,75% 100%,25% 100%,0% 50%);background:#F59E0B;margin:0 1px"></span>`
+    ).join("");
+    return `<div style="display:flex;align-items:center;gap:4px;margin-bottom:2px">
+      <span style="font-size:9px;color:var(--gray);min-width:14px">${katNo}.</span>
+      <div style="display:flex;flex-wrap:wrap;gap:1px">${dots}</div>
+    </div>`;
+  }).join("");
 }
 
 function saveFramesSetting() {
@@ -1159,7 +1173,7 @@ function renderTopluHiveList() {
         style="accent-color:var(--amber);width:17px;height:17px;flex-shrink:0">
       <div class="hex-icon" style="background:${h.color||"#F59E0B"};width:28px;height:24px;font-size:12px;flex-shrink:0">🐝</div>
       <span style="font-size:13px;font-weight:600;color:var(--brown);flex:1">${h.name}</span>
-      <span style="font-size:11px;color:var(--gray)">${renderKatCitaText(h)}</span>
+      <span style="font-size:11px;color:var(--gray)">${h.floors||1} kat</span>
     </label>`;
   }).join("");
 }
