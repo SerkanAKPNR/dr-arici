@@ -257,6 +257,93 @@
   </div>
 
   <div class="content" id="tab-records" style="display:none">
+    <!-- Toplu Uygulama Bölümü -->
+    <div style="margin-bottom:14px">
+      <div class="sec-title" style="margin-top:0;display:flex;justify-content:space-between;align-items:center">
+        <span>💊 Toplu Uygulama</span>
+        <button onclick="toggleTopluPanel()" id="toplu-toggle-btn"
+          style="background:var(--amber);color:#fff;border:none;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
+          + Yeni
+        </button>
+      </div>
+
+      <div id="toplu-panel" style="display:none;background:var(--white);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);margin-top:8px">
+
+        <!-- Uygulama Formu -->
+        <div class="field"><label>Tür *</label>
+          <select class="input" id="toplu-type">
+            <option value="ilaçlama">💊 İlaçlama</option>
+            <option value="besleme">🍬 Besleme</option>
+            <option value="muayene">🔍 Muayene</option>
+            <option value="hasat">🍯 Hasat</option>
+          </select>
+        </div>
+        <div class="field"><label>İlaç / Ürün / Başlık *</label>
+          <input class="input" id="toplu-drug" placeholder="Formik asit, Oxalic asit...">
+        </div>
+        <div class="field"><label>Tarih *</label>
+          <input class="input" id="toplu-date" type="date">
+        </div>
+        <div class="field">
+          <label style="display:flex;align-items:center;gap:8px">
+            <input type="checkbox" id="toplu-repeat-check" onchange="toggleRepeat()" style="accent-color:var(--amber);width:16px;height:16px">
+            Tekrar hatırlatıcısı ekle
+          </label>
+        </div>
+        <div id="toplu-repeat-box" style="display:none;background:var(--cream2);border-radius:10px;padding:12px;margin-bottom:12px">
+          <div style="display:flex;align-items:center;gap:8px;font-size:14px">
+            <span style="color:var(--brown2)">Bu uygulamadan</span>
+            <input type="number" id="toplu-days" min="1" max="365" value="10"
+              style="width:64px;padding:6px 8px;border:1.5px solid var(--gray2);border-radius:8px;font-size:14px;text-align:center">
+            <span style="color:var(--brown2)">gün sonra hatırlat</span>
+          </div>
+          <div id="toplu-repeat-preview" style="font-size:12px;color:var(--amber);margin-top:6px"></div>
+        </div>
+        <div class="field"><label>Not</label>
+          <input class="input" id="toplu-note" placeholder="Doz, uygulayan...">
+        </div>
+
+        <!-- Kovan Seçimi -->
+        <div style="font-size:12px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;margin-top:4px">
+          Kovan Seçimi
+        </div>
+
+        <!-- Hızlı seçim butonları -->
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+          <button onclick="topluHepsiniSec(true)" class="filter-btn active" style="font-size:12px">✅ Hepsini Seç</button>
+          <button onclick="topluHepsiniSec(false)" class="filter-btn" style="font-size:12px">❌ Temizle</button>
+          <button onclick="topluSiraFiltresiAc()" class="filter-btn" id="toplu-sira-btn" style="font-size:12px">🔢 Sıra Filtresi</button>
+        </div>
+
+        <!-- Sıra filtresi -->
+        <div id="toplu-sira-box" style="display:none;background:var(--cream2);border-radius:10px;padding:10px;margin-bottom:10px">
+          <div style="font-size:12px;color:var(--gray);margin-bottom:6px">Sıra numarası aralığı:</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input type="number" id="toplu-sira-bas" min="1" placeholder="1"
+              style="width:64px;padding:6px 8px;border:1.5px solid var(--gray2);border-radius:8px;font-size:14px;text-align:center">
+            <span style="color:var(--gray)">—</span>
+            <input type="number" id="toplu-sira-son" placeholder="30"
+              style="width:64px;padding:6px 8px;border:1.5px solid var(--gray2);border-radius:8px;font-size:14px;text-align:center">
+            <button onclick="topluSiraFiltrele()" style="background:var(--amber);color:#fff;border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Uygula</button>
+          </div>
+        </div>
+
+        <!-- Kovan listesi -->
+        <div id="toplu-hive-list" style="max-height:220px;overflow-y:auto;border:1px solid var(--gray2);border-radius:10px;padding:6px"></div>
+
+        <!-- Kroki üzerinden seçim -->
+        <div style="font-size:12px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 8px">
+          veya Krokiden Seç
+        </div>
+        <div id="toplu-mini-kroki" style="overflow-x:auto;padding-bottom:4px"></div>
+
+        <div style="display:flex;gap:8px;margin-top:14px">
+          <button onclick="toggleTopluPanel()" class="btn btn-outline" style="flex:1">İptal</button>
+          <button onclick="topluKaydet()" class="btn btn-primary" style="flex:1">💾 Kaydet</button>
+        </div>
+      </div>
+    </div>
+
     <div id="detail-banner-rec" style="display:none"></div>
     <div id="records-list"><div class="loading">⏳</div></div>
   </div>
@@ -975,6 +1062,161 @@ function saveFramesSetting() {
   renderHives();
 }
 
+
+// ─── TOPLU UYGULAMA ──────────────────────────────────────────────
+let topluSeciliKovanlar = new Set();
+
+function toggleTopluPanel() {
+  const panel = $("toplu-panel");
+  const open = panel.style.display !== "none";
+  panel.style.display = open ? "none" : "block";
+  if (!open) {
+    $("toplu-date").value = today();
+    topluSeciliKovanlar = new Set();
+    renderTopluHiveList();
+    renderTopluMiniKroki();
+    updateRepeatPreview();
+  }
+}
+
+function toggleRepeat() {
+  const checked = $("toplu-repeat-check").checked;
+  $("toplu-repeat-box").style.display = checked ? "block" : "none";
+  updateRepeatPreview();
+}
+
+function updateRepeatPreview() {
+  const el = $("toplu-repeat-preview");
+  if (!el) return;
+  const date = $("toplu-date")?.value;
+  const days = parseInt($("toplu-days")?.value || "10");
+  if (!date || !days) { el.textContent = ""; return; }
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  el.textContent = "→ Hatırlatıcı: " + d.toLocaleDateString("tr-TR", {day:"numeric",month:"long",year:"numeric"});
+}
+
+// Tarih veya gün değişince preview güncelle
+document.addEventListener("input", e => {
+  if (e.target.id === "toplu-date" || e.target.id === "toplu-days") updateRepeatPreview();
+});
+
+function renderTopluHiveList() {
+  const el = $("toplu-hive-list");
+  if (!el) return;
+  if (!hives.length) { el.innerHTML = '<div style="padding:10px;font-size:13px;color:var(--gray)">Kovan bulunamadı</div>'; return; }
+  el.innerHTML = hives.map(h => {
+    const sel = topluSeciliKovanlar.has(h.id);
+    return `<label style="display:flex;align-items:center;gap:10px;padding:8px 6px;border-bottom:1px solid var(--gray2);cursor:pointer">
+      <input type="checkbox" ${sel?"checked":""} onchange="topluToggleKovan('${h.id}',this.checked)"
+        style="accent-color:var(--amber);width:17px;height:17px;flex-shrink:0">
+      <div class="hex-icon" style="background:${h.color||"#F59E0B"};width:28px;height:24px;font-size:12px;flex-shrink:0">🐝</div>
+      <span style="font-size:13px;font-weight:600;color:var(--brown);flex:1">${h.name}</span>
+      <span style="font-size:11px;color:var(--gray)">${h.floors||1}k · ${(h.floors||1)*getFramesPerFloor()}ç</span>
+    </label>`;
+  }).join("");
+}
+
+function renderTopluMiniKroki() {
+  const el = $("toplu-mini-kroki");
+  if (!el) return;
+  let html = `<div style="display:flex;flex-direction:column;gap:3px;min-width:${COLS*20}px">`;
+  for (let r = 0; r < ROWS; r++) {
+    html += `<div style="display:flex;gap:2px;align-items:center">`;
+    html += `<span style="font-size:10px;color:var(--gray);width:14px;flex-shrink:0">${r+1}</span>`;
+    for (let c = 0; c < COLS; c++) {
+      const hive = hiveAtPos(r, c);
+      if (hive) {
+        const sel = topluSeciliKovanlar.has(hive.id);
+        html += `<div onclick="topluToggleKovan('${hive.id}',${!sel});renderTopluMiniKroki();renderTopluHiveList()"
+          title="${hive.name}"
+          style="width:18px;height:22px;border-radius:3px;
+          background:${sel ? hive.color||"#F59E0B" : "#E5E7EB"};
+          border:2px solid ${sel ? (hive.color||"#F59E0B") : "#D1D5DB"};
+          cursor:pointer;flex-shrink:0;transition:all .1s;
+          opacity:${sel?1:0.5}"></div>`;
+      } else {
+        html += `<div style="width:18px;height:22px;border-radius:3px;background:#F9FAFB;border:1px dashed #E5E7EB;flex-shrink:0"></div>`;
+      }
+    }
+    html += `</div>`;
+  }
+  html += `</div>`;
+  el.innerHTML = html;
+}
+
+function topluToggleKovan(id, checked) {
+  if (checked) topluSeciliKovanlar.add(id);
+  else topluSeciliKovanlar.delete(id);
+  renderTopluHiveList();
+  renderTopluMiniKroki();
+}
+
+function topluHepsiniSec(sec) {
+  if (sec) hives.forEach(h => topluSeciliKovanlar.add(h.id));
+  else topluSeciliKovanlar.clear();
+  renderTopluHiveList();
+  renderTopluMiniKroki();
+}
+
+function topluSiraFiltresiAc() {
+  const box = $("toplu-sira-box");
+  box.style.display = box.style.display === "none" ? "block" : "none";
+}
+
+function topluSiraFiltrele() {
+  const bas = parseInt($("toplu-sira-bas").value) || 1;
+  const son = parseInt($("toplu-sira-son").value) || hives.length;
+  topluSeciliKovanlar.clear();
+  hives.forEach((h, i) => {
+    const sira = i + 1;
+    if (sira >= bas && sira <= son) topluSeciliKovanlar.add(h.id);
+  });
+  renderTopluHiveList();
+  renderTopluMiniKroki();
+  showToast(`${topluSeciliKovanlar.size} kovan seçildi`);
+}
+
+async function topluKaydet() {
+  const drug = $("toplu-drug").value.trim();
+  const date = $("toplu-date").value;
+  if (!drug || !date) { showToast("Başlık ve tarih gerekli"); return; }
+  if (!topluSeciliKovanlar.size) { showToast("En az bir kovan seç"); return; }
+
+  const type = $("toplu-type").value;
+  const note = $("toplu-note").value.trim();
+  const repeat = $("toplu-repeat-check").checked;
+  const days = parseInt($("toplu-days")?.value || "10");
+
+  const batch = [];
+  topluSeciliKovanlar.forEach(hiveId => {
+    // Ana giriş
+    batch.push(addDoc(col("takvim"), {
+      hiveId, type, drug, date, note, done: false,
+      createdAt: serverTimestamp(),
+    }));
+    // Tekrar hatırlatıcısı
+    if (repeat && days > 0) {
+      const d = new Date(date);
+      d.setDate(d.getDate() + days);
+      const repeatDate = d.toISOString().split("T")[0];
+      batch.push(addDoc(col("takvim"), {
+        hiveId, type, drug,
+        date: repeatDate,
+        note: (note ? note + " — " : "") + "Tekrar hatırlatıcısı",
+        done: false,
+        createdAt: serverTimestamp(),
+      }));
+    }
+  });
+
+  await Promise.all(batch);
+  const tekrar = repeat ? ` + ${topluSeciliKovanlar.size} hatırlatıcı` : "";
+  showToast(`✓ ${topluSeciliKovanlar.size} kovana kaydedildi${tekrar}`);
+  toggleTopluPanel();
+  loadSchedules();
+}
+
 // ─── KROKI ───────────────────────────────────────────────────────
 const ROWS = 3, COLS = 30;
 let selectedPos = null; // {row, col}
@@ -1143,6 +1385,47 @@ window.selectHiveFromKroki = function(id) {
   `;
   openModal('modal-kovan-detay');
 };
+
+
+// ─── SWIPE ───────────────────────────────────────────────────────
+(function() {
+  let startX = 0, startY = 0, startT = 0;
+  const content = document.querySelector("#app");
+  content.addEventListener("touchstart", e => {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    startT = Date.now();
+  }, {passive:true});
+  content.addEventListener("touchend", e => {
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+    const dt = Date.now() - startT;
+    if (Math.abs(dx) < 50 || Math.abs(dy) > Math.abs(dx) * 0.8 || dt > 400) return;
+    // Kaydırılabilir alan içindeyse geçme
+    let el = e.target;
+    while (el && el !== document.body) {
+      const oy = window.getComputedStyle(el).overflowX;
+      if ((oy === "auto" || oy === "scroll") && el.scrollWidth > el.clientWidth) return;
+      el = el.parentElement;
+    }
+    const order = getTabOrder().map(t => t.key).concat(["settings"]);
+    const idx = order.indexOf(activeTab);
+    if (dx < 0 && idx < order.length - 1) switchTab(order[idx + 1]);
+    if (dx > 0 && idx > 0) switchTab(order[idx - 1]);
+  }, {passive:true});
+})();
+
+function switchTab(key) {
+  activeTab = key;
+  const allKeys = ["hives","schedule","records","kroki","settings"];
+  allKeys.forEach(k => {
+    const el = $("tab-" + k);
+    if (el) el.style.display = activeTab === k ? "" : "none";
+  });
+  document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === key));
+  if (activeTab === "kroki") renderKroki();
+  if (activeTab === "settings") renderSettings();
+}
 
 // Başlangıçta kayıtlı sekme sırası uygula
 applyTabOrder(getTabOrder());
