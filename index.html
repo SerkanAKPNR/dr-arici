@@ -617,7 +617,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import {
   getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, setDoc,
-  doc, query, where, orderBy, onSnapshot, serverTimestamp
+  doc, query, where, orderBy, onSnapshot, serverTimestamp, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -717,11 +717,7 @@ $("btn-register").onclick = async () => {
   } catch(err) { showAuthError(err.code); }
 };
 $("btn-logout").onclick = () => {
-  if (_unsubAyarlar) _unsubAyarlar();
-  if (_unsubHives) _unsubHives();
-  if (_unsubSchedules) _unsubSchedules();
-  if (_unsubRecords) _unsubRecords();
-  if (_unsubGecmis) _unsubGecmis();
+  [_unsubAyarlar,_unsubHives,_unsubSchedules,_unsubRecords,_unsubGecmis].forEach(u=>u&&u());
   signOut(auth);
 };
 
@@ -742,17 +738,145 @@ function showAuthError(code) {
 onAuthStateChanged(auth, async (user) => {
   currentUser = user;
   if (user) {
-    $("auth-screen").style.display = "none";
-    $("app").style.display = "block";
-    loadAll();
+    if (user.email === ADMIN_EMAIL) {
+      // Admin: işletme seçim ekranı
+      const isletmeler = await getIsletmeler();
+      if (isletmeler.length === 0) {
+        // İlk giriş — kendi işletmesini oluştur
+        await setDoc(doc(db, `users/${user.uid}/ayarlar/genel`), {
+          isletmeAd: "Ana Arılık", sahipEmail: user.email
+        }, { merge: true });
+        isletmeler.push({ uid: user.uid, ad: "Ana Arılık" });
+      }
+      showIsletmeSecim(isletmeler);
+    } else {
+      // Normal kullanıcı — direkt kendi işletmesine gir
+      activeIsletmeId = user.uid;
+      $("auth-screen").style.display = "none";
+      $("app").style.display = "block";
+      // İşletme adını header'da göster
+      const ayarSnap = await getDocs(collection(db, `users/${user.uid}/ayarlar`));
+      loadAll();
+    }
   } else {
+    activeIsletmeId = null;
     $("auth-screen").style.display = "flex";
     $("app").style.display = "none";
   }
 });
 
+async function getIsletmeler() {
+  const isletmeler = [];
+  try {
+    // Admin tüm users/ altındaki ayarlar/genel'i okur
+    // Basit çözüm: bilinen UID'leri Firestore'da sakla
+    const adminDoc = await getDocs(collection(db, "admin_isletmeler"));
+    adminDoc.forEach(d => isletmeler.push({ uid: d.id, ...d.data() }));
+    // Kendi uid'ini de ekle
+    if (!isletmeler.find(i => i.uid === currentUser.uid)) {
+      isletmeler.push({ uid: currentUser.uid, ad: "Ana Arılık" });
+    }
+  } catch(e) { isletmeler.push({ uid: currentUser.uid, ad: "Ana Arılık" }); }
+  return isletmeler;
+}
+
+function showIsletmeSecim(isletmeler) {
+  const screen = $("auth-screen");
+  screen.style.display = "flex";
+  $("app").style.display = "none";
+  screen.innerHTML = `
+    <div class="auth-card">
+      <div class="auth-logo">🐝</div>
+      <h1 class="auth-title">Dr. Arıcı</h1>
+      <p class="auth-sub">İşletme Seç</p>
+      <div style="display:flex;flex-direction:column;gap:8px;width:100%;margin-bottom:12px">
+        ${isletmeler.map(i => `
+          <div style="display:flex;gap:8px">
+            <button onclick="isletmeyeGir('${i.uid}','${i.ad}')"
+              style="flex:1;background:var(--white);border:1.5px solid var(--gray2);border-radius:12px;padding:14px;text-align:left;cursor:pointer;transition:border-color .2s"
+              onmouseover="this.style.borderColor='var(--amber)'" onmouseout="this.style.borderColor='var(--gray2)'">
+              <div style="font-weight:700;font-size:15px;color:var(--brown)">🏡 ${i.ad}</div>
+              <div style="font-size:12px;color:var(--gray);margin-top:2px">${i.email||''}</div>
+            </button>
+          </div>`).join("")}
+      </div>
+      <button onclick="yeniIsletmeEkle()"
+        style="width:100%;padding:11px;border:1.5px dashed var(--gray2);border-radius:10px;background:none;color:var(--gray);cursor:pointer;font-size:14px;font-family:inherit;margin-bottom:8px">
+        + Yeni İşletme Ekle
+      </button>
+      <button onclick="signOut(auth)" style="background:none;border:none;color:var(--gray);cursor:pointer;font-size:13px;font-family:inherit">🚪 Çıkış Yap</button>
+    </div>`;
+}
+
+window.isletmeyeGir = async function(uid, ad) {
+  activeIsletmeId = uid;
+  $("auth-screen").style.display = "none";
+  $("app").style.display = "block";
+  // Header'da işletme adı
+  const logoEl = document.querySelector(".header-logo span");
+  if (logoEl) logoEl.textContent = ad;
+  // Admin için işletme değiştir butonu
+  if (currentUser.email === ADMIN_EMAIL) {
+    const logoutBtn = $("btn-logout");
+    if (logoutBtn) logoutBtn.textContent = "🔄 İşletme";
+    if (logoutBtn) logoutBtn.onclick = async () => {
+      // Dinleyicileri kapat
+      [_unsubAyarlar, _unsubHives, _unsubSchedules, _unsubRecords, _unsubGecmis]
+        .forEach(u => u && u());
+      const isletmeler = await getIsletmeler();
+      showIsletmeSecim(isletmeler);
+    };
+  }
+  loadAll();
+};
+
+window.yeniIsletmeEkle = async function() {
+  const ad = prompt("İşletme adı:");
+  if (!ad) return;
+  const email = prompt("Kullanıcı e-postası:");
+  if (!email) return;
+  const sifre = prompt("Şifre (en az 6 karakter):");
+  if (!sifre || sifre.length < 6) { showToast("Şifre en az 6 karakter!"); return; }
+  try {
+    // İkincil app ile kullanıcı oluştur
+    const { initializeApp: initApp2 } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js");
+    const { getAuth: getAuth2, createUserWithEmailAndPassword: createUser2 } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js");
+    const app2 = initApp2({ ...firebaseConfig }, "ikincil_" + Date.now());
+    const auth2 = getAuth2(app2);
+    const cred = await createUser2(auth2, email, sifre);
+    const newUid = cred.user.uid;
+    await auth2.signOut();
+
+    // admin_isletmeler'e ekle
+    await setDoc(doc(db, "admin_isletmeler", newUid), { ad, email, sahipUid: currentUser.uid });
+    // Kullanıcının kendi ayarlarına da yaz
+    await setDoc(doc(db, `users/${newUid}/ayarlar/genel`), { isletmeAd: ad, sahipEmail: email }, { merge: true });
+
+    showToast(`✓ "${ad}" işletmesi oluşturuldu!`);
+    const isletmeler = await getIsletmeler();
+    showIsletmeSecim(isletmeler);
+  } catch(e) {
+    if (e.code === "auth/email-already-in-use") {
+      // Hesap var, sadece işletme ekle
+      showToast("⚠️ Bu e-posta zaten kayıtlı, işletme eklendi");
+    } else {
+      showToast("⚠️ Hata: " + e.message);
+    }
+  }
+};
+
 // ─── FIRESTORE HELPERS ──────────────────────────────────────────
-const col = (name) => collection(db, `users/${currentUser.uid}/${name}`);
+let activeIsletmeId = null;
+const ADMIN_EMAIL = "akpinar.serkan.vet@gmail.com";
+
+const col = (name) => {
+  const uid = activeIsletmeId || currentUser.uid;
+  return collection(db, `users/${uid}/${name}`);
+};
+const isletmeDoc = (path) => {
+  const uid = activeIsletmeId || currentUser.uid;
+  return doc(db, `users/${uid}/${path}`);
+};
 
 function loadAll() {
   loadAyarlar();
@@ -766,7 +890,7 @@ function loadAll() {
 let _unsubAyarlar = null;
 function loadAyarlar() {
   if (_unsubAyarlar) _unsubAyarlar();
-  const ayarDoc = doc(db, `users/${currentUser.uid}/ayarlar/genel`);
+  const ayarDoc = isletmeDoc("ayarlar/genel");
   _unsubAyarlar = onSnapshot(ayarDoc, snap => {
     if (snap.exists()) {
       const d = snap.data();
@@ -784,7 +908,7 @@ function loadAyarlar() {
 
 async function saveAyarlarToFirestore() {
   if (!currentUser || !db) return;
-  const ayarDoc = doc(db, `users/${currentUser.uid}/ayarlar/genel`);
+  const ayarDoc = isletmeDoc("ayarlar/genel");
   await setDoc(ayarDoc, {
     gruplar: getGruplar(),
     tipler: getTipler(),
@@ -971,7 +1095,7 @@ window.deleteHive = async function(id, durum, not) {
 
   if (durum === "silindi") {
     // Kalıcı sil: geçmişe gitme, numara serbest kalsın
-    await deleteDoc(doc(db, `users/${currentUser.uid}/kovanllar/${id}`));
+    await deleteDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${id}`));
     showToast("Kovan kalıcı silindi ✓");
   } else {
     // Satıldı / Söndü: geçmişe taşı, numarayı yasakla
@@ -983,7 +1107,7 @@ window.deleteHive = async function(id, durum, not) {
       arsivTarih: new Date().toISOString().split("T")[0],
       arsivAt: serverTimestamp(),
     });
-    await deleteDoc(doc(db, `users/${currentUser.uid}/kovanllar/${id}`));
+    await deleteDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${id}`));
     showToast(durum === "satildi" ? "Kovan satıldı ✓" : "Kovan söndü olarak işaretlendi");
   }
   loadAll();
@@ -2440,7 +2564,7 @@ async function testSil(id) {
 Geçmişe gitmez, numara serbest kalır.
 
 Emin misin?`)) return;
-  await deleteDoc(doc(db, `users/${currentUser.uid}/kovanllar/${id}`));
+  await deleteDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${id}`));
   showToast("Test kovanı silindi, numara serbest ✓");
   loadAll();
 }
@@ -2681,6 +2805,8 @@ window.hiveNotKaydet = hiveNotKaydet;
 window.hiveNotSil = hiveNotSil;
 window.renderHiveNotes = renderHiveNotes;
 window.renderGelir = renderGelir;
+window.isletmeyeGir = isletmeyeGir;
+window.yeniIsletmeEkle = yeniIsletmeEkle;
 window.gelirKaydet = gelirKaydet;
 window.gelirSil = gelirSil;
 window.yedekAlExcel = yedekAlExcel;
