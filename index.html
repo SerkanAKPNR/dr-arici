@@ -473,7 +473,6 @@
       <input class="input" id="hive-name" type="number" min="1" placeholder="1">
       <div id="hive-name-hint" style="font-size:12px;color:var(--amber);margin-top:4px"></div>
     </div>
-    <div class="field"><label>Lokasyon</label><input class="input" id="hive-loc" placeholder="Bahçe, çayır..."></div>
     <div class="field">
       <label>Köken Kovan <span style="font-size:11px;color:var(--gray);font-weight:400">(opsiyonel — bölünme, aktarma vs.)</span></label>
       <select class="input" id="hive-origin">
@@ -502,12 +501,10 @@
       </select>
     </div>
     <div id="kat-cita-fields"></div>
-    <div class="field"><label>Bal (kg)</label><input class="input" id="hive-honey" type="number" min="0" placeholder="0"></div>
     <div class="field">
       <label>Renk</label>
       <div class="color-picker" id="hive-color-picker"></div>
     </div>
-    <div class="field"><label>Not</label><textarea class="input" id="hive-notes" placeholder="Opsiyonel..."></textarea></div>
     <div class="field">
       <label>Arılıktaki Konum</label>
       <div id="pos-selected" style="font-size:13px;color:var(--amber);margin-bottom:6px;min-height:18px"></div>
@@ -570,6 +567,22 @@
   </div>
 </div>
 
+
+
+<!-- MODAL: Kovan Not -->
+<div class="modal-overlay" id="modal-hive-not">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">📝 Not Ekle</div>
+    <div class="field">
+      <textarea class="input" id="hive-not-text" placeholder="Gözlem, kontrol notu..." style="height:100px;resize:none"></textarea>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-outline" onclick="closeModal('modal-hive-not')">İptal</button>
+      <button class="btn btn-primary" onclick="hiveNotKaydet()">Kaydet</button>
+    </div>
+  </div>
+</div>
 
 <!-- MODAL: Kovan İşlem -->
 <div class="modal-overlay" id="modal-kovan-islem">
@@ -887,15 +900,13 @@ function renderHives() {
       </div>
       <div class="card-meta">
         <div style="text-align:left">
-          <div class="card-sub">${h.type||''} ${h.location ? '· '+h.location : ''}</div>
+          <div class="card-sub">${h.type||''}</div>
         </div>
-        ${h.honey > 0 ? `<div style="text-align:right">
-          <div class="card-meta-item">🍯 Bal</div>
-          <div class="card-meta-val">${h.honey} kg</div>
-        </div>` : ''}
+
       </div>
       ${h.originHiveId ? `<div style="margin-top:6px;font-size:12px;color:var(--amber);font-weight:600">🔀 Köken: ${hives.find(x=>x.id===h.originHiveId)?.name||'?'}. Kovan</div>` : ''}
       ${h.notes ? `<div style="margin-top:8px;font-size:12px;color:var(--gray);border-top:1px dashed var(--gray2);padding-top:8px">${h.notes}</div>` : ''}
+      ${renderHiveNotes(h)}
       <div style="margin-top:10px;display:flex;gap:8px">
         <button onclick="event.stopPropagation();editHive('${h.id}')" style="flex:1;padding:7px;border:1px solid var(--gray2);border-radius:8px;background:var(--white);cursor:pointer;font-size:12px">✏️ Düzenle</button>
         <button onclick="event.stopPropagation();kovanIslemModal('${h.id}')" style="flex:1;padding:7px;border:1px solid #FEE2E2;border-radius:8px;background:#FFF5F5;cursor:pointer;font-size:12px;color:var(--red)">⬇️ İşlem</button>
@@ -931,7 +942,6 @@ window.editHive = function(id) {
   editingHiveId = id;
   $("hive-modal-title").textContent = "✏️ Kovan Düzenle";
   $("hive-name").value = h.name||"";
-  $("hive-loc").value = h.location||"";
   populateHiveOriginSelect("hive-origin", h.originHiveId||"");
   populateGroupSelect("hive-group", h.group||"");
   populateHiveTypeSelect(h.type||"Langstroth");
@@ -944,8 +954,6 @@ window.editHive = function(id) {
   renderMiniGrid();
   $("hive-floors").value = h.floors||1;
   renderKatCitaFields(h.frames);
-  $("hive-honey").value = h.honey||0;
-  $("hive-notes").value = h.notes||"";
   renderColorPicker(h.color||HIVE_COLORS[0]);
   openModal("modal-hive");
 };
@@ -1090,7 +1098,7 @@ $("hive-save").onclick = async () => {
   const banned = getBannedNumbers();
   if (!editingHiveId && banned.includes(num)) { showToast("Bu numara daha önce kullanılmış, verilemez!"); return; }
   const data = {
-    name, location: $("hive-loc").value.trim(),
+    name,
     group: $("hive-group").value || null,
     originHiveId: $("hive-origin").value || null,
     type: $("hive-type").value,
@@ -1100,8 +1108,6 @@ $("hive-save").onclick = async () => {
     pos: selectedPos,
     floors: Number($("hive-floors").value||1),
     frames: getKatCitaValues(),
-    honey: Number($("hive-honey").value||0),
-    notes: $("hive-notes").value.trim(),
     color: selectedColor,
   };
   if (editingHiveId) {
@@ -1196,7 +1202,7 @@ $("fab-btn").onclick = () => {
   if (activeTab === "hives") {
     editingHiveId = null;
     $("hive-modal-title").textContent = "🐝 Yeni Kovan";
-    ["hive-loc","hive-breed","hive-queen","hive-honey","hive-notes"].forEach(id => $(id).value = "");
+    ["hive-breed","hive-queen"].forEach(id => $(id).value = "");
     populateHiveOriginSelect("hive-origin", "");
     populateGroupSelect("hive-group", "");
     const nextNum = getNextHiveNumber();
@@ -1472,6 +1478,59 @@ function populateHiveTypeSelect(selected) {
   sel.innerHTML = list.map(t => `<option value="${t}" ${t===(selected||"Langstroth")?"selected":""}>${t}</option>`).join("");
 }
 
+
+// ─── KOVAN NOTLARI ───────────────────────────────────────────────
+let notEklenenHiveId = null;
+
+function renderHiveNotes(h) {
+  const notlar = (h.notlar || []).slice().reverse();
+  if (!notlar.length) {
+    return `<div style="margin-top:8px">
+      <button onclick="notEkleAc('${h.id}')" style="font-size:12px;color:var(--amber);background:none;border:1px dashed var(--amber);border-radius:8px;padding:4px 10px;cursor:pointer;font-family:inherit">📝 Not Ekle</button>
+    </div>`;
+  }
+  return `<div style="margin-top:8px;border-top:1px dashed var(--gray2);padding-top:8px">
+    ${notlar.map((n, i) => `
+      <div style="display:flex;gap:8px;align-items:flex-start;padding:5px 0;border-bottom:1px solid var(--gray2)">
+        <div style="flex:1">
+          <div style="font-size:11px;color:var(--amber);font-weight:600;margin-bottom:2px">${n.tarih}</div>
+          <div style="font-size:13px;color:var(--brown2)">${n.metin}</div>
+        </div>
+        <button onclick="hiveNotSil('${h.id}',${notlar.length-1-i})" style="background:none;border:none;color:var(--gray);cursor:pointer;font-size:14px;flex-shrink:0">🗑️</button>
+      </div>`).join("")}
+    <button onclick="notEkleAc('${h.id}')" style="margin-top:6px;font-size:12px;color:var(--amber);background:none;border:1px dashed var(--amber);border-radius:8px;padding:4px 10px;cursor:pointer;font-family:inherit">+ Not Ekle</button>
+  </div>`;
+}
+
+function notEkleAc(hiveId) {
+  notEklenenHiveId = hiveId;
+  $("hive-not-text").value = "";
+  openModal("modal-hive-not");
+}
+
+async function hiveNotKaydet() {
+  const metin = $("hive-not-text").value.trim();
+  if (!metin) { showToast("Not boş olamaz"); return; }
+  const hive = hives.find(h => h.id === notEklenenHiveId);
+  if (!hive) return;
+  const notlar = hive.notlar || [];
+  const tarih = new Date().toLocaleDateString("tr-TR", { day:"numeric", month:"long", year:"numeric" });
+  notlar.push({ metin, tarih });
+  await updateDoc(doc(db, `users/${currentUser.uid}/kovanllar/${notEklenenHiveId}`), { notlar });
+  closeModal("modal-hive-not");
+  showToast("Not eklendi ✓");
+}
+
+async function hiveNotSil(hiveId, idx) {
+  if (!confirm("Bu not silinsin mi?")) return;
+  const hive = hives.find(h => h.id === hiveId);
+  if (!hive) return;
+  const notlar = [...(hive.notlar || [])];
+  notlar.splice(idx, 1);
+  await updateDoc(doc(db, `users/${currentUser.uid}/kovanllar/${hiveId}`), { notlar });
+  showToast("Not silindi");
+}
+
 // ─── KOVAN GEÇMİŞİ & İŞLEM ──────────────────────────────────────
 let kovanGecmis = [];
 
@@ -1511,7 +1570,7 @@ function renderGecmis() {
         <div class="hex-icon" style="background:${k.color||'#9CA3AF'};width:36px;height:31px;font-size:14px">🐝</div>
         <div style="flex:1">
           <div style="font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:var(--brown)">${k.name}. Kovan</div>
-          <div style="font-size:12px;color:var(--gray)">${k.type||''} ${k.location?'· '+k.location:''}</div>
+          <div style="font-size:12px;color:var(--gray)">${k.type||''}</div>
         </div>
         <span style="font-size:12px;font-weight:700;color:${durumColor[k.arsivDurum]||'var(--gray)'};
           background:var(--cream2);padding:3px 10px;border-radius:20px">
@@ -1697,10 +1756,7 @@ function renderHome() {
           <div style="font-size:20px;font-weight:700;color:var(--brown)">${toplamCita}</div>
           <div style="font-size:11px;color:var(--gray)">Çıta</div>
         </div>
-        <div style="text-align:center;flex:1;background:var(--cream2);border-radius:8px;padding:8px">
-          <div style="font-size:20px;font-weight:700;color:var(--green2)">${gKovanlar.reduce((s,h)=>s+(Number(h.honey)||0),0)}</div>
-          <div style="font-size:11px;color:var(--gray)">kg Bal</div>
-        </div>
+
       </div>
     </div>`;
   });
@@ -2054,7 +2110,7 @@ window.selectHiveFromKroki = function(id) {
       <div class="hex-icon" style="background:${hive.color||'#F59E0B'};width:44px;height:38px;font-size:18px">🐝</div>
       <div style="flex:1">
         <div style="font-family:'Playfair Display',serif;font-size:20px;color:var(--brown);font-weight:700">${hive.name}</div>
-        <div style="font-size:12px;color:var(--gray)">${hive.type||''} ${hive.location?'· '+hive.location:''}</div>
+        <div style="font-size:12px;color:var(--gray)">${hive.type||''}</div>
       </div>
       <button onclick="closeModal('modal-kovan-detay')" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--gray)">✕</button>
     </div>
@@ -2073,8 +2129,7 @@ window.selectHiveFromKroki = function(id) {
         <div style="font-weight:700;color:var(--brown)">${hive.floors||1} kat · ${frames} çıta</div>
       </div>
       <div style="background:var(--cream2);border-radius:10px;padding:10px 12px">
-        <div style="font-size:11px;color:var(--gray);margin-bottom:4px">🍯 Bal</div>
-        <div style="font-weight:700;color:var(--amber)">${hive.honey||0} kg</div>
+  
       </div>
     </div>
 
@@ -2146,7 +2201,7 @@ document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.da
 });
 
 // Close modals on overlay click
-["modal-hive","modal-sched","modal-rec","modal-kovan-detay","modal-kovan-islem"].forEach(id => {
+["modal-hive","modal-sched","modal-rec","modal-kovan-detay","modal-kovan-islem","modal-hive-not"].forEach(id => {
   $(id).onclick = e => { if (e.target === $(id)) closeModal(id); };
 });
 // ─── TEST SİL ────────────────────────────────────────────────────
@@ -2221,12 +2276,12 @@ async function yedekAlExcel() {
   const tarih = new Date().toISOString().split("T")[0];
 
   // Kovanlar
-  const kovSatir = [["No","Tip","Lokasyon","Grup","Kraliçe Yılı","Irk","Koloni Gücü","Kat","Toplam Çıta","Bal (kg)","Köken","Not"]];
+  const kovSatir = [["No","Tip","Grup","Kraliçe Yılı","Irk","Koloni Gücü","Kat","Toplam Çıta","Köken"]];
   hives.forEach(h => {
     const grup = getGruplar().find(g => g.id === h.group);
     const frames = Array.isArray(h.frames) ? h.frames.reduce((a,b)=>a+b,0) : (h.frames||0);
     const koken = hives.find(x => x.id === h.originHiveId);
-    kovSatir.push([h.name, h.type||"", h.location||"", grup?.ad||"", h.queen||"", h.breed||"", h.strength||"", h.floors||1, frames, h.honey||0, koken?.name||"", h.notes||""]);
+    kovSatir.push([h.name, h.type||"", grup?.ad||"", h.queen||"", h.breed||"", h.strength||"", h.floors||1, frames, koken?.name||""]);
   });
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(kovSatir), "Kovanlar");
 
@@ -2340,8 +2395,8 @@ function filterByType(tip) {
       </div>
       <div style="margin:8px 0 6px">${renderKatCitaText(h)}</div>
       <div class="card-meta">
-        <div><div class="card-sub">${h.type||""} ${h.location?"· "+h.location:""}</div></div>
-        ${h.honey > 0 ? `<div style="text-align:right"><div class="card-meta-item">🍯 Bal</div><div class="card-meta-val">${h.honey} kg</div></div>` : ""}
+        <div><div class="card-sub">${h.type||""}</div></div>
+
       </div>
     </div>`;
   }).join("");
@@ -2395,6 +2450,10 @@ async function numarayiSerbest(name) {
   renderGecmis();
 }
 window.numarayiSerbest = numarayiSerbest;
+window.notEkleAc = notEkleAc;
+window.hiveNotKaydet = hiveNotKaydet;
+window.hiveNotSil = hiveNotSil;
+window.renderHiveNotes = renderHiveNotes;
 window.yedekAlExcel = yedekAlExcel;
 window.yedekYukle = yedekYukle;
 window.applyTabOrder = applyTabOrder;
