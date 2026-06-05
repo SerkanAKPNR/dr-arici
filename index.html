@@ -435,6 +435,18 @@
         </div>
       </div>
 
+      <div class="sec-title" style="color:var(--red)">Tehlikeli Bölge</div>
+      <div style="background:var(--white);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);border:1.5px solid #FEE2E2">
+        <div style="font-size:12px;color:var(--gray);margin-bottom:12px">Bu işlemler geri alınamaz!</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+
+          <button onclick="tumVeriyiSil()"
+            style="width:100%;padding:11px;background:var(--white);border:1.5px solid var(--red);border-radius:10px;font-size:14px;cursor:pointer;font-family:inherit;color:var(--red);font-weight:700">
+            🗑️ Tüm Veriyi Sil
+          </button>
+        </div>
+      </div>
+
       <div class="sec-title">Hesap</div>
       <div style="background:var(--white);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow)">
         <div style="font-size:13px;color:var(--gray);margin-bottom:12px" id="settings-email">—</div>
@@ -1506,9 +1518,17 @@ function renderGecmis() {
           ${durumIcon[k.arsivDurum]||''} ${durumLabel[k.arsivDurum]||k.arsivDurum}
         </span>
       </div>
-      <div style="display:flex;gap:12px;font-size:12px;color:var(--gray)">
-        <span>📅 ${k.arsivTarih||'—'}</span>
-        ${k.arsivNot ? `<span>📝 ${k.arsivNot}</span>` : ''}
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+        <div style="display:flex;gap:12px;font-size:12px;color:var(--gray)">
+          <span>📅 ${k.arsivTarih||'—'}</span>
+          ${k.arsivNot ? `<span>📝 ${k.arsivNot}</span>` : ''}
+        </div>
+        ${getBannedNumbers().includes(parseInt(k.name)) ?
+          `<button onclick="numarayiSerbest('${k.name}')"
+            style="font-size:11px;padding:3px 10px;border:1px solid var(--amber);border-radius:20px;background:none;color:var(--amber);cursor:pointer;white-space:nowrap">
+            🔓 Numarayı Serbest Bırak
+          </button>` : ''
+        }
       </div>
     </div>`).join("");
 }
@@ -2333,6 +2353,48 @@ window.tipEkle = tipEkle;
 window.tipSil = tipSil;
 window.saveAyarlarToFirestore = saveAyarlarToFirestore;
 window.yedekAl = yedekAl;
+
+async function yasakliNumaralariSifirla() {
+  if (!confirm("Yasaklı numara listesi sıfırlansın mı?\n\nBu işlemden sonra eski numaralar tekrar kullanılabilir.")) return;
+  localStorage.removeItem("banned_hive_numbers");
+  await saveAyarlarToFirestore();
+  showToast("✓ Yasaklı numaralar sıfırlandı");
+}
+window.yasakliNumaralariSifirla = yasakliNumaralariSifirla;
+
+async function tumVeriyiSil() {
+  if (!confirm("⚠️ TÜM VERİ SİLİNECEK!\n\nKovanlar, takvim, kayıtlar, geçmiş — her şey!\n\nEmin misiniz?")) return;
+  if (!confirm("Son onay: Bu işlem GERİ ALINAMAZ!\n\nDevam etmek istiyor musunuz?")) return;
+  try {
+    showToast("⏳ Siliniyor...");
+    const batch = [];
+    const koleksiyonlar = ["kovanllar", "takvim", "kayitlar", "kovan_gecmis"];
+    for (const kol of koleksiyonlar) {
+      const snap = await getDocs(col(kol));
+      snap.docs.forEach(d => batch.push(deleteDoc(doc(db, `users/${currentUser.uid}/${kol}/${d.id}`))));
+    }
+    await Promise.all(batch);
+    // Yasaklı numaraları da sıfırla
+    localStorage.removeItem("banned_hive_numbers");
+    await saveAyarlarToFirestore();
+    showToast("✓ Tüm veriler silindi");
+    loadAll();
+  } catch(e) {
+    showToast("⚠️ Hata: " + e.message);
+  }
+}
+window.tumVeriyiSil = tumVeriyiSil;
+
+async function numarayiSerbest(name) {
+  const num = parseInt(name);
+  if (!confirm(`${num}. Kovan numarası serbest bırakılsın mı?\nBu numara yeni bir kovana verilebilir.`)) return;
+  const list = getBannedNumbers().filter(n => n !== num);
+  localStorage.setItem("banned_hive_numbers", JSON.stringify(list));
+  await saveAyarlarToFirestore();
+  showToast(`✓ ${num} numarası serbest bırakıldı`);
+  renderGecmis();
+}
+window.numarayiSerbest = numarayiSerbest;
 window.yedekAlExcel = yedekAlExcel;
 window.yedekYukle = yedekYukle;
 window.applyTabOrder = applyTabOrder;
