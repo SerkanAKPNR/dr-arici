@@ -260,6 +260,10 @@
     <div id="schedule-list"><div class="loading">⏳</div></div>
   </div>
 
+  <div class="content" id="tab-gelir" style="display:none">
+    <div id="gelir-content"></div>
+  </div>
+
   <div class="content" id="tab-gecmis" style="display:none">
     <div id="gecmis-content"><div class="loading">⏳</div></div>
   </div>
@@ -480,7 +484,7 @@
       </select>
     </div>
     <div class="field"><label>Grup</label>
-      <select class="input" id="hive-group">
+      <select class="input" id="hive-group" onchange="grupSecilince()">
         <option value="">— Grup yok</option>
       </select>
     </div>
@@ -503,6 +507,7 @@
     <div id="kat-cita-fields"></div>
     <div class="field">
       <label>Renk</label>
+      <div id="grup-renk-ipucu" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
       <div class="color-picker" id="hive-color-picker"></div>
     </div>
     <div class="field">
@@ -751,6 +756,7 @@ const col = (name) => collection(db, `users/${currentUser.uid}/${name}`);
 
 function loadAll() {
   loadAyarlar();
+  pazartesiKontrol();
   loadHives();
   loadSchedules();
   loadRecords();
@@ -1287,6 +1293,7 @@ function applyTabOrder(order) {
       $("tab-schedule").style.display = activeTab === "schedule" ? "" : "none";
       $("tab-records").style.display  = activeTab === "records"  ? "" : "none";
       $("tab-gecmis").style.display   = activeTab === "gecmis"   ? "" : "none";
+      $("tab-gelir").style.display    = activeTab === "gelir"    ? "" : "none";
       $("tab-kroki").style.display    = activeTab === "kroki"    ? "" : "none";
       $("tab-settings").style.display = activeTab === "settings" ? "" : "none";
       if (activeTab === "kroki") renderKroki();
@@ -1478,6 +1485,182 @@ function populateHiveTypeSelect(selected) {
   sel.innerHTML = list.map(t => `<option value="${t}" ${t===(selected||"Langstroth")?"selected":""}>${t}</option>`).join("");
 }
 
+
+
+// ─── GELİR / GİDER ───────────────────────────────────────────────
+const GELIR_KATEGORILER = ["Bal Satışı", "Balmumu", "Arı Satışı", "Diğer Gelir"];
+const GIDER_KATEGORILER = ["İlaç", "Şeker", "Ekipman", "Diğer Gider"];
+
+function haftaBaslangic(tarih) {
+  const d = new Date(tarih);
+  const gun = d.getDay(); // 0=Pazar, 1=Pazartesi
+  const fark = (gun === 0) ? -6 : 1 - gun;
+  d.setDate(d.getDate() + fark);
+  d.setHours(0,0,0,0);
+  return d;
+}
+
+function haftaKey(tarih) {
+  const d = haftaBaslangic(tarih);
+  return d.toISOString().split("T")[0];
+}
+
+function buHaftaKey() { return haftaKey(new Date()); }
+
+function pazartesiKontrol() {
+  const bugun = new Date();
+  const gun = bugun.getDay(); // 1 = Pazartesi
+  if (gun !== 1) return;
+  const key = "gelir_uyari_" + buHaftaKey();
+  if (localStorage.getItem(key)) return;
+  localStorage.setItem(key, "1");
+  setTimeout(() => {
+    if (confirm("💰 Yeni hafta başladı!\n\nBu haftanın gelir/giderini girmek ister misiniz?")) {
+      switchTab("gelir");
+    }
+  }, 1500);
+}
+
+function getGelirGider() {
+  try { return JSON.parse(localStorage.getItem("gelir_gider") || "[]"); } catch(e) { return []; }
+}
+
+function saveGelirGider(list) {
+  localStorage.setItem("gelir_gider", JSON.stringify(list));
+}
+
+function renderGelir() {
+  const el = $("gelir-content");
+  if (!el) return;
+  const tumKayitlar = getGelirGider();
+  const buHafta = buHaftaKey();
+
+  // Hafta listesi (benzersiz)
+  const haftalar = [...new Set(tumKayitlar.map(k => k.hafta))].sort().reverse();
+
+  // Aktif hafta
+  const aktifHafta = window._aktifGelirHafta || buHafta;
+
+  const haftaKayitlar = tumKayitlar.filter(k => k.hafta === aktifHafta);
+  const toplamGelir = haftaKayitlar.filter(k => k.tur === "gelir").reduce((s,k) => s + k.tutar, 0);
+  const toplamGider = haftaKayitlar.filter(k => k.tur === "gider").reduce((s,k) => s + k.tutar, 0);
+  const net = toplamGelir - toplamGider;
+
+  // Hafta adı
+  const haftaBaslangicD = new Date(aktifHafta);
+  const haftaBitis = new Date(aktifHafta);
+  haftaBitis.setDate(haftaBitis.getDate() + 6);
+  const haftaLabel = `${haftaBaslangicD.toLocaleDateString("tr-TR",{day:"numeric",month:"short"})} – ${haftaBitis.toLocaleDateString("tr-TR",{day:"numeric",month:"short",year:"numeric"})}`;
+
+  el.innerHTML = `
+    <!-- Özet -->
+    <div style="background:linear-gradient(135deg,var(--brown),var(--amber));border-radius:var(--radius);padding:16px;margin-bottom:14px;color:#fff">
+      <div style="font-size:13px;opacity:.8;margin-bottom:4px">${haftaLabel}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center">
+        <div><div style="font-size:20px;font-weight:700">₺${toplamGelir.toLocaleString("tr-TR")}</div><div style="font-size:11px;opacity:.8">Gelir</div></div>
+        <div><div style="font-size:20px;font-weight:700">₺${toplamGider.toLocaleString("tr-TR")}</div><div style="font-size:11px;opacity:.8">Gider</div></div>
+        <div><div style="font-size:20px;font-weight:700;color:${net>=0?'#86EFAC':'#FCA5A5'}">₺${net.toLocaleString("tr-TR")}</div><div style="font-size:11px;opacity:.8">Net</div></div>
+      </div>
+    </div>
+
+    <!-- Giriş formu -->
+    <div style="background:var(--white);border-radius:var(--radius);padding:14px;margin-bottom:14px;box-shadow:var(--shadow)">
+      <div style="display:flex;gap:6px;margin-bottom:10px">
+        <button onclick="window._gelirTur='gelir';document.getElementById('gelir-tur-btn').textContent='✅ Gelir';document.getElementById('gelir-tur-btn').style.background='var(--green2)'"
+          id="gelir-tur-btn"
+          style="flex:1;padding:8px;border:none;border-radius:8px;background:var(--green2);color:#fff;font-weight:700;cursor:pointer;font-family:inherit;font-size:13px">
+          ✅ Gelir
+        </button>
+        <button onclick="window._gelirTur='gider';document.getElementById('gelir-tur-btn').textContent='❌ Gider';document.getElementById('gelir-tur-btn').style.background='var(--red)'"
+          style="flex:1;padding:8px;border:none;border-radius:8px;background:var(--white);border:1.5px solid var(--gray2);color:var(--brown2);font-weight:700;cursor:pointer;font-family:inherit;font-size:13px">
+          ❌ Gider
+        </button>
+      </div>
+      <div class="field">
+        <label>Kategori</label>
+        <select class="input" id="gelir-kategori">
+          ${GELIR_KATEGORILER.concat(GIDER_KATEGORILER).map(k => `<option value="${k}">${k}</option>`).join("")}
+        </select>
+      </div>
+      <div class="field">
+        <label>Tutar (₺)</label>
+        <input class="input" id="gelir-tutar" type="number" min="0" placeholder="0">
+      </div>
+      <div class="field">
+        <label>Not</label>
+        <input class="input" id="gelir-not" placeholder="Opsiyonel...">
+      </div>
+      <button onclick="gelirKaydet()" class="btn btn-primary" style="width:100%;padding:11px">💾 Kaydet</button>
+    </div>
+
+    <!-- Kayıtlar -->
+    ${haftaKayitlar.length ? `
+    <div style="background:var(--white);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);margin-bottom:14px">
+      <div class="sec-title" style="margin-top:0">Bu Hafta Kayıtlar</div>
+      ${haftaKayitlar.slice().reverse().map((k,i) => `
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--gray2)">
+          <span style="font-size:18px">${k.tur==="gelir"?"💰":"💸"}</span>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:600;color:var(--brown)">${k.kategori}</div>
+            ${k.not?`<div style="font-size:12px;color:var(--gray)">${k.not}</div>`:""}
+          </div>
+          <span style="font-weight:700;color:${k.tur==="gelir"?"var(--green2)":"var(--red)"}">
+            ${k.tur==="gelir"?"+":"-"}₺${k.tutar.toLocaleString("tr-TR")}
+          </span>
+          <button onclick="gelirSil(${haftaKayitlar.length-1-i},'${aktifHafta}')" style="background:none;border:none;color:var(--gray);cursor:pointer;font-size:14px">🗑️</button>
+        </div>`).join("")}
+    </div>` : ""}
+
+    <!-- Geçmiş haftalar -->
+    ${haftalar.filter(h => h !== aktifHafta).length ? `
+    <div style="background:var(--white);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow)">
+      <div class="sec-title" style="margin-top:0">Geçmiş Haftalar</div>
+      ${haftalar.filter(h=>h!==aktifHafta).map(h => {
+        const hk = tumKayitlar.filter(k=>k.hafta===h);
+        const g = hk.filter(k=>k.tur==="gelir").reduce((s,k)=>s+k.tutar,0);
+        const gi = hk.filter(k=>k.tur==="gider").reduce((s,k)=>s+k.tutar,0);
+        const hBitis = new Date(h); hBitis.setDate(hBitis.getDate()+6);
+        return `<div onclick="window._aktifGelirHafta='${h}';renderGelir()" style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--gray2);cursor:pointer">
+          <span style="font-size:13px;color:var(--brown)">${new Date(h).toLocaleDateString("tr-TR",{day:"numeric",month:"short"})} – ${hBitis.toLocaleDateString("tr-TR",{day:"numeric",month:"short"})}</span>
+          <span style="font-size:13px;font-weight:700;color:${g-gi>=0?"var(--green2)":"var(--red)"}">₺${(g-gi).toLocaleString("tr-TR")}</span>
+        </div>`;
+      }).join("")}
+    </div>` : ""}
+  `;
+
+  window._gelirTur = window._gelirTur || "gelir";
+  window._aktifGelirHafta = aktifHafta;
+}
+
+function gelirKaydet() {
+  const tutar = parseFloat($("gelir-tutar").value);
+  if (!tutar || tutar <= 0) { showToast("Geçerli bir tutar gir"); return; }
+  const list = getGelirGider();
+  list.push({
+    tur: window._gelirTur || "gelir",
+    kategori: $("gelir-kategori").value,
+    tutar,
+    not: $("gelir-not").value.trim(),
+    hafta: buHaftaKey(),
+    tarih: new Date().toISOString().split("T")[0],
+  });
+  saveGelirGider(list);
+  $("gelir-tutar").value = "";
+  $("gelir-not").value = "";
+  showToast("Kaydedildi ✓");
+  renderGelir();
+}
+
+function gelirSil(idx, hafta) {
+  if (!confirm("Bu kayıt silinsin mi?")) return;
+  const list = getGelirGider();
+  const haftaKayitlar = list.filter(k => k.hafta === hafta);
+  const gercekIdx = list.indexOf(haftaKayitlar[haftaKayitlar.length - 1 - idx]);
+  if (gercekIdx !== -1) list.splice(gercekIdx, 1);
+  saveGelirGider(list);
+  renderGelir();
+  showToast("Silindi");
+}
 
 // ─── KOVAN NOTLARI ───────────────────────────────────────────────
 let notEklenenHiveId = null;
@@ -1694,12 +1877,33 @@ function populateHiveOriginSelect(elId, selected) {
     hives.map(h => `<option value="${h.id}" ${h.id===selected?'selected':''}>${h.name}. Kovan</option>`).join("");
 }
 
+function grupSecilince() {
+  const grupId = $("hive-group").value;
+  if (!grupId) return;
+  const grup = getGruplar().find(g => g.id === grupId);
+  if (grup && grup.renk) {
+    selectedColor = grup.renk;
+    renderColorPicker(grup.renk);
+  }
+}
+window.grupSecilince = grupSecilince;
+
 function populateGroupSelect(elId, selected) {
   const sel = $(elId);
   if (!sel) return;
   const list = getGruplar();
   sel.innerHTML = `<option value="">— Grup yok</option>` +
     list.map(g => `<option value="${g.id}" ${g.id===selected?'selected':''}>${g.ad}</option>`).join("");
+  // Renk ipuçlarını güncelle
+  const ipucu = $("grup-renk-ipucu");
+  if (ipucu) {
+    ipucu.innerHTML = list.map(g =>
+      `<div onclick="pickColor('${g.renk}')" style="display:flex;align-items:center;gap:4px;background:var(--cream2);border-radius:20px;padding:3px 8px;cursor:pointer;border:1.5px solid transparent;transition:all .15s" title="${g.ad}">
+        <div style="width:12px;height:12px;border-radius:50%;background:${g.renk};flex-shrink:0"></div>
+        <span style="font-size:11px;color:var(--brown2)">${g.ad}</span>
+      </div>`
+    ).join("");
+  }
 }
 
 // ─── ANA SAYFA ───────────────────────────────────────────────────
@@ -2040,10 +2244,10 @@ function renderKroki() {
           title="${hive.name}&#10;${hive.floors||1} kat · Güç: ${hive.strength||1}/10"
           style="width:24px;height:36px;border-radius:4px;background:${hive.color||'#F59E0B'};border:2px solid ${hive.color||'#F59E0B'};
           cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;
-          font-size:10px;color:#fff;font-weight:700;flex-direction:column;gap:1px;
+          font-size:9px;color:#fff;font-weight:700;flex-direction:column;gap:0px;
           box-shadow:0 2px 6px rgba(0,0,0,.15);transition:transform .15s"
           onmouseover="this.style.transform='scale(1.15)'" onmouseout="this.style.transform='scale(1)'">
-          🐝<span style="font-size:8px">${hive.name.replace('Kovan ','K')}</span>
+          <span style="font-size:10px;font-weight:800;line-height:1">${hive.name}</span>
           </div>`;
       } else {
         html += `<div title="Sıra ${r+1}, Kolon ${c+1} — Boş"
@@ -2056,9 +2260,30 @@ function renderKroki() {
   }
   html += `</div>`;
 
-  // Legend
-  html += `<div style="margin-top:14px;font-size:12px;color:var(--gray);display:flex;gap:16px;flex-wrap:wrap">`;
-  html += `<span>🐝 Dolu kovan</span><span style="display:flex;align-items:center;gap:4px"><span style="width:14px;height:14px;border-radius:3px;background:#F9FAFB;border:1.5px dashed #D1D5DB;display:inline-block"></span> Boş</span>`;
+  // Legend — gruplar
+  const gruplar = getGruplar();
+  html += `<div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:8px">`;
+  if (gruplar.length) {
+    gruplar.forEach(g => {
+      const sayi = hives.filter(h => h.group === g.id).length;
+      if (sayi > 0) html += `<div style="display:flex;align-items:center;gap:6px;background:var(--white);border-radius:8px;padding:5px 10px;box-shadow:var(--shadow)">
+        <div style="width:14px;height:14px;border-radius:3px;background:${g.renk};flex-shrink:0"></div>
+        <span style="font-size:12px;font-weight:600;color:var(--brown)">${g.ad}</span>
+        <span style="font-size:11px;color:var(--gray)">(${sayi})</span>
+      </div>`;
+    });
+  }
+  // Grupsuz
+  const grupsuz = hives.filter(h => !h.group).length;
+  if (grupsuz > 0) html += `<div style="display:flex;align-items:center;gap:6px;background:var(--white);border-radius:8px;padding:5px 10px;box-shadow:var(--shadow)">
+    <div style="width:14px;height:14px;border-radius:3px;background:#9CA3AF;flex-shrink:0"></div>
+    <span style="font-size:12px;color:var(--gray)">Grupsuz (${grupsuz})</span>
+  </div>`;
+  // Boş hücre göstergesi
+  html += `<div style="display:flex;align-items:center;gap:6px;background:var(--white);border-radius:8px;padding:5px 10px;box-shadow:var(--shadow)">
+    <div style="width:14px;height:14px;border-radius:3px;background:#F9FAFB;border:1.5px dashed #D1D5DB;flex-shrink:0"></div>
+    <span style="font-size:12px;color:var(--gray)">Boş</span>
+  </div>`;
   html += `</div>`;
 
   el.innerHTML = html;
@@ -2180,7 +2405,7 @@ window.selectHiveFromKroki = function(id) {
 
 function switchTab(key) {
   activeTab = key;
-  const allKeys = ["home","hives","schedule","records","gecmis","kroki","settings"];
+  const allKeys = ["home","hives","schedule","records","gecmis","gelir","kroki","settings"];
   allKeys.forEach(k => {
     const el = $("tab-" + k);
     if (el) el.style.display = activeTab === k ? "" : "none";
@@ -2190,13 +2415,14 @@ function switchTab(key) {
   if (activeTab === "settings") renderSettings();
   if (activeTab === "home") renderHome();
   if (activeTab === "gecmis") renderGecmis();
+  if (activeTab === "gelir") renderGelir();
 }
 
 // Başlangıçta kayıtlı sekme sırası uygula
 applyTabOrder(getTabOrder());
 activeTab = "home";
 document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === "home"));
-["tab-home","tab-hives","tab-schedule","tab-records","tab-gecmis","tab-kroki","tab-settings"].forEach(id => {
+["tab-home","tab-hives","tab-schedule","tab-records","tab-gecmis","tab-gelir","tab-kroki","tab-settings"].forEach(id => {
   const el = $(id); if(el) el.style.display = id === "tab-home" ? "" : "none";
 });
 
@@ -2454,6 +2680,9 @@ window.notEkleAc = notEkleAc;
 window.hiveNotKaydet = hiveNotKaydet;
 window.hiveNotSil = hiveNotSil;
 window.renderHiveNotes = renderHiveNotes;
+window.renderGelir = renderGelir;
+window.gelirKaydet = gelirKaydet;
+window.gelirSil = gelirSil;
 window.yedekAlExcel = yedekAlExcel;
 window.yedekYukle = yedekYukle;
 window.applyTabOrder = applyTabOrder;
