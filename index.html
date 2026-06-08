@@ -1252,7 +1252,18 @@ $("hive-save").onclick = async () => {
     color: selectedColor,
   };
   if (editingHiveId) {
-    await updateDoc(doc(db, `users/${currentUser.uid}/kovanllar/${editingHiveId}`), data);
+    // Grup değiştiyse renk güncellemesi sor
+    const eskiHive = hives.find(h => h.id === editingHiveId);
+    const yeniGrupId = data.group;
+    if (eskiHive && eskiHive.group !== yeniGrupId && yeniGrupId) {
+      const yeniGrup = getGruplar().find(g => g.id === yeniGrupId);
+      if (yeniGrup && yeniGrup.renk && yeniGrup.renk !== eskiHive.color) {
+        if (confirm(`🎨 Grup değişti!\n\nKovan rengi "${yeniGrup.ad}" grubunun rengiyle güncellensin mi?`)) {
+          data.color = yeniGrup.renk;
+        }
+      }
+    }
+    await updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${editingHiveId}`), data);
     showToast("Kovan güncellendi ✓");
   } else {
     data.createdAt = serverTimestamp();
@@ -2199,7 +2210,7 @@ function renderTopluHiveList() {
 function renderTopluMiniKroki() {
   const el = $("toplu-mini-kroki");
   if (!el) return;
-  let html = `<div style="display:flex;flex-direction:column;gap:3px;min-width:${COLS*20}px">`;
+  let html = `<div style="display:flex;flex-direction:column;gap:3px;min-width:${COLS*24}px">`;
   for (let r = 0; r < ROWS; r++) {
     html += `<div style="display:flex;gap:2px;align-items:center">`;
     html += `<span style="font-size:10px;color:var(--gray);width:14px;flex-shrink:0">${r+1}</span>`;
@@ -2208,7 +2219,7 @@ function renderTopluMiniKroki() {
       if (hive) {
         const sel = topluSeciliKovanlar.has(hive.id);
         html += `<div onclick="topluToggleKovan('${hive.id}',${!sel});renderTopluMiniKroki();renderTopluHiveList()"
-          title="${hive.name}"
+          title="${hive.name}. Kovan — Sıra ${r+1}, Sağdan ${COLS-c}"
           style="width:18px;height:22px;border-radius:3px;
           background:${sel ? hive.color||"#F59E0B" : "#E5E7EB"};
           border:2px solid ${sel ? (hive.color||"#F59E0B") : "#D1D5DB"};
@@ -2323,7 +2334,7 @@ async function topluKaydet() {
 }
 
 // ─── KROKI ───────────────────────────────────────────────────────
-const ROWS = 3, COLS = 30;
+const ROWS = 3, COLS = 50;
 let selectedPos = null; // {row, col}
 
 function posKey(r, c) { return `${r}-${c}`; }
@@ -2333,7 +2344,7 @@ function updatePosLabel() {
   const el = $("pos-selected");
   if (!el) return;
   el.textContent = selectedPos
-    ? `✅ Sıra ${selectedPos.row + 1}, Kolon ${selectedPos.col + 1} seçildi`
+    ? `✅ Sıra ${selectedPos.row + 1}, Sağdan ${COLS - selectedPos.col}. konum seçildi`
     : "Henüz konum seçilmedi";
 }
 
@@ -2352,8 +2363,9 @@ function renderMiniGrid() {
       if (isOccupied) { bg = hive.color || '#F59E0B'; border = hive.color || '#F59E0B'; cursor = 'not-allowed'; }
       else if (isSel) { bg = '#FCD34D'; border = '#D97706'; }
       html += `<div onclick="selectPos(${r},${c})"
-        title="${isOccupied ? hive.name : `Sıra ${r+1}, Kolon ${c+1}`}"
-        style="width:18px;height:18px;border-radius:3px;background:${bg};border:1.5px solid ${border};cursor:${cursor};flex-shrink:0;transition:all .1s"></div>`;
+        title="${isOccupied ? hive.name+'. Kovan' : `Sıra ${r+1}, Sağdan ${COLS-c}`}"
+        style="width:20px;height:20px;border-radius:3px;background:${bg};border:1.5px solid ${border};cursor:${cursor};flex-shrink:0;transition:all .1s;display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;font-weight:700">
+        ${isOccupied ? hive.name : ''}</div>`;
     }
     html += `</div>`;
   }
@@ -2387,7 +2399,7 @@ function renderKroki() {
           <span style="font-size:10px;font-weight:800;line-height:1">${hive.name}</span>
           </div>`;
       } else {
-        html += `<div title="Sıra ${r+1}, Kolon ${c+1} — Boş"
+        html += `<div title="Sıra ${r+1}, Sağdan ${COLS-c}"
           style="width:24px;height:36px;border-radius:4px;background:#F9FAFB;border:1.5px dashed #D1D5DB;
           cursor:pointer;flex-shrink:0;transition:background .15s"
           onmouseover="this.style.background='#FEF3C7'" onmouseout="this.style.background='#F9FAFB'"></div>`;
