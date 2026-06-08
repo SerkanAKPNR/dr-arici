@@ -74,7 +74,7 @@
   .tab.active { color: var(--amber); border-bottom-color: var(--amber); }
 
   /* CONTENT */
-  .content { padding: 14px; }
+  .content { padding: 14px; padding-bottom: 80px; }
 
   /* CARDS */
   .card {
@@ -2647,12 +2647,14 @@ function krokiAyrintilariGoster(id, krokiMod) {
     const dx = e.changedTouches[0].clientX - startX;
     const dy = e.changedTouches[0].clientY - startY;
     const dt = Date.now() - startT;
-    if (Math.abs(dx) < 50 || Math.abs(dy) > Math.abs(dx) * 0.8 || dt > 400) return;
-    // Kaydırılabilir alan içindeyse geçme
+    // Daha sıkı kontrol: yatay hareket belirgin olmalı
+    if (Math.abs(dx) < 80 || Math.abs(dy) > Math.abs(dx) * 0.4 || dt > 300) return;
+    // Kaydırılabilir alan içindeyse geçme (yatay ve dikey)
     let el = e.target;
     while (el && el !== document.body) {
-      const oy = window.getComputedStyle(el).overflowX;
-      if ((oy === "auto" || oy === "scroll") && el.scrollWidth > el.clientWidth) return;
+      const st = window.getComputedStyle(el);
+      if ((st.overflowX === "auto" || st.overflowX === "scroll") && el.scrollWidth > el.clientWidth) return;
+      if ((st.overflowY === "auto" || st.overflowY === "scroll") && el.scrollHeight > el.clientHeight) return;
       el = el.parentElement;
     }
     const order = getTabOrder().map(t => t.key).concat(["settings"]);
