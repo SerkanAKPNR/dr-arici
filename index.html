@@ -2377,20 +2377,34 @@ function renderKroki() {
   const el = $("kroki-grid");
   if (!el) return;
   let html = `<div style="display:flex;flex-direction:column;gap:6px;min-width:${COLS*28+24}px">`;
-  // Column numbers header
-  html += `<div style="display:flex;gap:4px;padding-left:22px">`;
-  for (let c = 0; c < COLS; c++) {
-    html += `<div style="width:24px;text-align:center;font-size:9px;color:var(--gray);flex-shrink:0">${c+1}</div>`;
+
+  // Kaydırma butonları
+  html += `<div style="display:flex;gap:8px;margin-bottom:6px;flex-wrap:wrap">`;
+  for (let r = 0; r < ROWS; r++) {
+    html += `<button onclick="kovanKaydirModal(${r})"
+      style="background:var(--white);border:1.5px solid var(--amber);border-radius:8px;padding:5px 12px;
+      font-size:12px;color:var(--amber);cursor:pointer;font-family:inherit;font-weight:600">
+      ↔️ ${r+1}. Sıra Kaydır
+    </button>`;
   }
   html += `</div>`;
+
+  // Başlık — sağdan sola: sağdan 1, 2, 3...
+  html += `<div style="display:flex;gap:4px;padding-left:22px">`;
+  for (let c = COLS-1; c >= 0; c--) {
+    html += `<div style="width:24px;text-align:center;font-size:9px;color:var(--gray);flex-shrink:0">${COLS-c}</div>`;
+  }
+  html += `</div>`;
+
   for (let r = 0; r < ROWS; r++) {
     html += `<div style="display:flex;gap:4px;align-items:center">`;
     html += `<span style="font-size:11px;font-weight:700;color:var(--brown2);width:18px;flex-shrink:0">${r+1}</span>`;
-    for (let c = 0; c < COLS; c++) {
+    // Sağdan sola çiz
+    for (let c = COLS-1; c >= 0; c--) {
       const hive = hiveAtPos(r, c);
       if (hive) {
         html += `<div onclick="selectHiveFromKroki('${hive.id}')"
-          title="${hive.name}&#10;${hive.floors||1} kat · Güç: ${hive.strength||1}/10"
+          title="${hive.name}. Kovan — Sıra ${r+1}, Sağdan ${COLS-c}"
           style="width:24px;height:36px;border-radius:4px;background:${hive.color||'#F59E0B'};border:2px solid ${hive.color||'#F59E0B'};
           cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;
           font-size:9px;color:#fff;font-weight:700;flex-direction:column;gap:0px;
@@ -2743,6 +2757,61 @@ async function yedekYukle(event) {
     showToast("⚠️ Hata: " + e.message);
   }
   event.target.value = "";
+}
+
+
+// ─── KOVAN KAYDIRMA ──────────────────────────────────────────────
+window.kovanKaydirModal = function(sira) {
+  const siraKovanlar = hives.filter(h => h.pos && h.pos.row === sira);
+  if (!siraKovanlar.length) { showToast("Bu sırada konum atanmış kovan yok"); return; }
+
+  const yon = confirm(
+    `↔️ ${sira+1}. Sıra Kaydırma\n\n` +
+    `${siraKovanlar.length} kovan var.\n\n` +
+    `TAMAM → Sağa Kaydır (sağdan 1→2, 2→3...)\n` +
+    `İPTAL → İşlemi durdur\n\n` +
+    `Sola kaydırmak için aşağıdaki onayı bekle.`
+  );
+
+  if (yon) {
+    // Sağa kaydır
+    kaydirUygula(sira, 1);
+  } else {
+    // Sola kaydırmak için sor
+    const sola = confirm(
+      `↔️ ${sira+1}. Sıra\n\nSola kaydır? (sağdan 2→1, 3→2...)`
+    );
+    if (sola) kaydirUygula(sira, -1);
+  }
+};
+
+async function kaydirUygula(sira, yon) {
+  // yon: +1 sağa, -1 sola
+  const siraKovanlar = hives.filter(h => h.pos && h.pos.row === sira);
+
+  // Çakışma kontrolü — sınır aşılıyor mu?
+  for (const h of siraKovanlar) {
+    const yeniCol = h.pos.col + yon;
+    if (yeniCol < 0 || yeniCol >= COLS) {
+      showToast("⚠️ Kaydırma yapılamıyor — sınır dışına çıkıyor!");
+      return;
+    }
+    // Hedef pozisyonda başka kovan var mı?
+    const hedef = hives.find(x => x.pos && x.pos.row === sira && x.pos.col === yeniCol && x.id !== h.id);
+    if (hedef && !siraKovanlar.find(s => s.id === hedef.id)) {
+      showToast(`⚠️ ${yeniCol+1}. kolonda başka bir kovan var!`);
+      return;
+    }
+  }
+
+  // Uygula
+  const batch = siraKovanlar.map(h =>
+    updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${h.id}`), {
+      pos: { row: sira, col: h.pos.col + yon }
+    })
+  );
+  await Promise.all(batch);
+  showToast(`✓ ${siraKovanlar.length} kovan ${yon > 0 ? "sağa" : "sola"} kaydırıldı`);
 }
 
 // ─── GLOBAL EXPOSE ──────────────────────────────────────────────
