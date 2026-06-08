@@ -2505,26 +2505,20 @@ window.selectPos = function(r, c) {
 let krokiSeciliHiveId = null;
 
 window.selectHiveFromKroki = function(id) {
-  // Kroki sekmesindeyse konum düzenleme modu
   if (activeTab === "kroki") {
-    krokiSeciliHiveId = krokiSeciliHiveId === id ? null : id;
-    const hive = hives.find(h => h.id === krokiSeciliHiveId);
-    const panel = $("kroki-ok-panel");
-    const bilgi = $("kroki-secili-bilgi");
-    if (hive && panel && bilgi) {
-      panel.style.display = "block";
-      bilgi.textContent = `${hive.name}. Kovan seçili`;
-    } else if (panel) {
-      panel.style.display = "none";
+    // Taşıma modundaysa seçimi değiştir
+    if (krokiSeciliHiveId) {
+      krokiSecimKaldir();
+      return;
     }
-    renderKroki();
+    // Kovan kartını popup olarak göster
+    krokiAyrintilariGoster(id, true);
     return;
   }
-  // Diğer sekmelerden gelince popup aç (eski davranış)
   krokiAyrintilariGoster(id);
 };
 
-function krokiAyrintilariGoster(id) {
+function krokiAyrintilariGoster(id, krokiMod) {
   const hive = hives.find(h => h.id === id);
   if (!hive) return;
   const tasks = schedules.filter(s => s.hiveId === id && !s.done).length;
@@ -2594,8 +2588,10 @@ function krokiAyrintilariGoster(id) {
     <div style="display:flex;gap:8px;margin-top:14px">
       <button onclick="closeModal('modal-kovan-detay');editHive('${hive.id}')"
         style="flex:1;padding:10px;border:1px solid var(--gray2);border-radius:10px;background:var(--white);cursor:pointer;font-size:13px;font-family:inherit">✏️ Düzenle</button>
-      <button onclick="closeModal('modal-kovan-detay');selectedHiveId='${hive.id}';activeTab='schedule';applyTabOrder(getTabOrder())"
-        style="flex:1;padding:10px;border:none;border-radius:10px;background:var(--amber);color:#fff;cursor:pointer;font-size:13px;font-weight:700;font-family:inherit">📋 Takvim</button>
+      ${krokiMod ? `<button onclick="closeModal('modal-kovan-detay');krokiTasiModuBaslat('${hive.id}')"
+        style="flex:1;padding:10px;border:none;border-radius:10px;background:var(--amber);color:#fff;cursor:pointer;font-size:13px;font-weight:700;font-family:inherit">↔️ Taşı</button>` :
+      `<button onclick="closeModal('modal-kovan-detay');selectedHiveId='${hive.id}';activeTab='schedule';applyTabOrder(getTabOrder())"
+        style="flex:1;padding:10px;border:none;border-radius:10px;background:var(--amber);color:#fff;cursor:pointer;font-size:13px;font-weight:700;font-family:inherit">📋 Takvim</button>`}
     </div>
   `;
   openModal('modal-kovan-detay');
