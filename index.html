@@ -2859,45 +2859,54 @@ window.kovanTasi = async function(rowDelta, colDelta) {
   if (yeniRow < 0 || yeniRow >= ROWS) { showToast("Sıra sınırı aşıldı!"); return; }
   if (yeniCol < 0 || yeniCol >= COLS) { showToast("Kolon sınırı aşıldı!"); return; }
 
-  // Hedef dolu mu? (seçili kovan hariç)
+  // Mevcut satırdaki diğer kovanlar (seçili hariç, orijinal pozisyonlarıyla)
   const digerKovanlar = hives.filter(h =>
     h.id !== krokiSeciliHiveId && h.pos && h.pos.row === yeniRow
   );
   const hedef = digerKovanlar.find(h => h.pos.col === yeniCol);
 
   if (hedef) {
-    // Dolu hücre — o yönde ilk boşluğu bul
-    // colDelta ile aynı yönde ara, rowDelta ise herhangi yöne
-    const yon = colDelta !== 0 ? colDelta : (yeniCol > mevcutPoz.col ? 1 : -1);
+    // Dolu hücre — seçili kovanın hareket yönünde ilk boşluğu bul
+    // 15 sağa gidecekse (colDelta=-1 görsel sağ), 16,17,18 de sola/sağa kayar
+    // Görsel yön: colDelta > 0 = sol, colDelta < 0 = sağ
+    // Kovanları hangi yöne itmemiz lazım?
+    // 15 sağa (colDelta=-1): 16 15'in eski yerine, 17 16'nın yerine...
+    // Yani 16,17,18 SOLA kayar (col azalır, colDelta=+1 yönünde)
+    // 15 sola (colDelta=+1): 14,13,12 SAĞA kayar (col artar, colDelta=-1 yönünde)
+    const itmeYonu = -colDelta; // seçili kovan sağa gidince diğerleri sola iter
+
+    // itme yönünde ilk boşluğu bul (yeniCol'dan itibaren)
     let boslukCol = -1;
-    for (let c = yeniCol + yon; c >= 0 && c < COLS; c += yon) {
-      const dolu = digerKovanlar.find(h => h.pos.col === c);
-      if (!dolu) { boslukCol = c; break; }
+    for (let c = yeniCol + itmeYonu; c >= 0 && c < COLS; c += itmeYonu) {
+      if (!digerKovanlar.find(h => h.pos.col === c)) { boslukCol = c; break; }
     }
 
-    if (boslukCol === -1) { showToast("Bu satırda boş yer yok!"); return; }
+    if (boslukCol === -1) { showToast("Bu satırda yer açılamıyor!"); return; }
 
-    const kacKovan = Math.abs(boslukCol - yeniCol);
-    if (!confirm(`Bu konumda kovan var!\n\n${kacKovan} kovan ${yon > 0 ? "sağa" : "sola"} kaydırılacak.\nDevam edilsin mi?`)) return;
+    // Kaydırılacak kovanlar: yeniCol ile boslukCol arasındakiler
+    const aralik = itmeYonu > 0
+      ? digerKovanlar.filter(h => h.pos.col >= yeniCol && h.pos.col < boslukCol)
+      : digerKovanlar.filter(h => h.pos.col <= yeniCol && h.pos.col > boslukCol);
 
-    // Kaydırılacak kovanları bul (yeniCol ile boslukCol arasındakiler)
-    const kaydirilanlar = digerKovanlar
-      .filter(h => {
-        const c = h.pos.col;
-        return yon > 0 ? (c >= yeniCol && c < boslukCol) : (c <= yeniCol && c > boslukCol);
-      })
-      .sort((a,b) => yon > 0 ? b.pos.col - a.pos.col : a.pos.col - b.pos.col);
+    const kacKovan = aralik.length;
+    const yon_label = itmeYonu > 0 ? "sağa" : "sola";
+    if (!confirm(`Bu konumda kovan var!\n\n${kacKovan} kovan ${yon_label} kaydırılacak.\nDevam edilsin mi?`)) return;
 
-    // Firestore'da kaydır
-    const batch = kaydirilanlar.map(h =>
+    // En uzaktakinden başla (çakışma olmasın)
+    const siralı = [...aralik].sort((a,b) =>
+      itmeYonu > 0 ? b.pos.col - a.pos.col : a.pos.col - b.pos.col
+    );
+
+    const batch = siralı.map(h =>
       updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${h.id}`), {
-        pos: { row: yeniRow, col: h.pos.col + yon }
+        pos: { row: yeniRow, col: h.pos.col + itmeYonu }
       })
     );
     await Promise.all(batch);
+    // Firestore onSnapshot ile güncellenir, hemen devam et
   }
 
-  // Boş hücre — oraya taşı (kaydırmadan sonra da boş)
+  // Seçili kovanı yeni konuma taşı
   pendingPos[krokiSeciliHiveId] = {row: yeniRow, col: yeniCol};
 
   // Bilgi güncelle
