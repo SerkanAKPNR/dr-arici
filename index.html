@@ -2384,11 +2384,18 @@ function updatePosLabel() {
 function renderMiniGrid() {
   const el = $("mini-grid");
   if (!el) return;
-  let html = `<div style="display:flex;flex-direction:column;gap:3px;min-width:${COLS*22}px">`;
+  // Başlık — sağdan sola
+  let html = `<div style="display:flex;flex-direction:column;gap:3px;min-width:${COLS*22+18}px">`;
+  html += `<div style="display:flex;gap:3px;padding-left:18px">`;
+  for (let c = COLS-1; c >= 0; c--) {
+    html += `<div style="width:20px;text-align:center;font-size:8px;color:var(--gray);flex-shrink:0">${COLS-c}</div>`;
+  }
+  html += `</div>`;
   for (let r = 0; r < ROWS; r++) {
     html += `<div style="display:flex;gap:3px;align-items:center">`;
     html += `<span style="font-size:10px;color:var(--gray);width:14px;flex-shrink:0">${r+1}</span>`;
-    for (let c = 0; c < COLS; c++) {
+    // Sağdan sola
+    for (let c = COLS-1; c >= 0; c--) {
       const hive = hiveAtPos(r, c);
       const isSel = selectedPos && selectedPos.row === r && selectedPos.col === c;
       const isOccupied = hive && !(editingHiveId && hive.id === editingHiveId);
