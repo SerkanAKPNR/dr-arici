@@ -245,6 +245,10 @@
   </div>
 
   <div class="content" id="tab-hives" style="display:none">
+    <div style="margin-bottom:10px">
+      <input id="hive-search" class="input" placeholder="🔍 Numara, ırk, tip ara..."
+        oninput="renderHives()" style="margin-bottom:0">
+    </div>
     <div id="hives-list"><div class="loading">⏳</div></div>
   </div>
 
@@ -989,11 +993,18 @@ function updateStats() {
 // ─── RENDER HIVES ───────────────────────────────────────────────
 function renderHives() {
   const el = $("hives-list");
-  let filteredHives = hives;
+  let filteredHives = [...hives].sort((a,b) => parseInt(a.name||0) - parseInt(b.name||0));
   if (activeGrupFilter) {
-    if (activeGrupFilter === "__grupsuz__") filteredHives = hives.filter(h => !h.group);
-    else filteredHives = hives.filter(h => h.group === activeGrupFilter);
+    if (activeGrupFilter === "__grupsuz__") filteredHives = filteredHives.filter(h => !h.group);
+    else filteredHives = filteredHives.filter(h => h.group === activeGrupFilter);
   }
+  // Arama filtresi
+  const q = ($("hive-search")?.value||"").toLowerCase().trim();
+  if (q) filteredHives = filteredHives.filter(h =>
+    String(h.name).includes(q) ||
+    (h.breed||"").toLowerCase().includes(q) ||
+    (h.type||"").toLowerCase().includes(q)
+  );
 
   // Aktif filtre başlığı
   let filterHeader = "";
@@ -1348,7 +1359,7 @@ $("fab-btn").onclick = () => {
     renderColorPicker(HIVE_COLORS[0]);
     openModal("modal-hive");
     setTimeout(() => renderKatCitaFields(), 50);
-  } else if (activeTab === "kroki" || activeTab === "settings") {
+  } else if (activeTab === "kroki" || activeTab === "settings" || activeTab === "home") {
     return;
   } else if (activeTab === "schedule") {
     populateHiveSelects();
