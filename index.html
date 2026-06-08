@@ -2444,30 +2444,18 @@ function renderMiniGrid() {
 }
 
 
-function krokiHucreHTML(hive, r, c, isSecili) {
+function krokiHucreHTML(hive, isSecili) {
   const floors = parseInt(hive.floors) || 1;
   const color = hive.color || '#F59E0B';
-  const border = isSecili ? '3px solid #fff' : '2px solid ' + color;
+  const border = isSecili ? '3px solid #fff' : `2px solid ${color}`;
   const shadow = isSecili ? '0 0 0 3px var(--brown), 0 4px 12px rgba(0,0,0,.3)' : '0 2px 6px rgba(0,0,0,.15)';
   const scale = isSecili ? 'scale(1.2)' : 'scale(1)';
-
   let inner = '';
-  if (floors === 2) {
-    inner = '<div style="position:absolute;top:12px;left:0;right:0;height:2px;background:rgba(255,255,255,0.7)"></div>';
-  } else if (floors >= 3) {
-    inner = '<div style="position:absolute;top:12px;left:0;right:0;height:2px;background:rgba(255,255,255,0.7)"></div>' +
-            '<div style="position:absolute;top:24px;left:0;right:0;height:2px;background:rgba(255,255,255,0.7)"></div>';
-  }
-
-  const onclk = 'selectHiveFromKroki("' + hive.id + '")';
-  return '<div onclick="' + onclk + '"' +
-    ' title="' + hive.name + '. Kovan ' + floors + ' kat"' +
-    ' style="width:24px;height:36px;border-radius:4px;position:relative;overflow:hidden;' +
-    'background:' + color + ';border:' + border + ';box-shadow:' + shadow + ';' +
-    'cursor:pointer;flex-shrink:0;display:flex;align-items:flex-end;justify-content:center;' +
-    'font-size:10px;color:#fff;font-weight:800;transform:' + scale + ';transition:all .15s;padding-bottom:2px">' +
-    inner + hive.name + '</div>';
+  if (floors === 2) inner = '<div style="position:absolute;top:12px;left:0;right:0;height:2px;background:rgba(255,255,255,0.7)"></div>';
+  if (floors >= 3) inner = '<div style="position:absolute;top:12px;left:0;right:0;height:2px;background:rgba(255,255,255,0.7)"></div><div style="position:absolute;top:24px;left:0;right:0;height:2px;background:rgba(255,255,255,0.7)"></div>';
+  return `<div onclick="selectHiveFromKroki('${hive.id}')" style="width:24px;height:36px;border-radius:4px;position:relative;overflow:hidden;background:${color};border:${border};box-shadow:${shadow};cursor:pointer;flex-shrink:0;display:flex;align-items:flex-end;justify-content:center;font-size:10px;color:#fff;font-weight:800;transform:${scale};transition:all .15s;padding-bottom:2px">${inner}${hive.name}</div>`;
 }
+
 
 function renderKroki() {
   const el = $("kroki-grid");
@@ -2499,22 +2487,8 @@ function renderKroki() {
     for (let c = COLS-1; c >= 0; c--) {
       const hive = hiveAtPos(r, c);
       if (hive) {
-        const actualHive = hive;
-        const isSecili = actualHive && actualHive.id === krokiSeciliHiveId;
-        const isPending = false;
-        html += `<div onclick="selectHiveFromKroki('${actualHive.id}')"
-          title="${hive.name}. Kovan — Sıra ${r+1}, Sağdan ${COLS-c}"
-          style="width:24px;height:36px;border-radius:4px;
-          background:${actualHive.color||'#F59E0B'};
-          border:${isSecili ? '3px solid #fff' : isPending ? '2px dashed #fff' : '2px solid ' + (actualHive.color||'#F59E0B')};
-          box-shadow:${isSecili ? '0 0 0 3px var(--brown), 0 4px 12px rgba(0,0,0,.3)' : isPending ? '0 0 0 2px var(--amber)' : '0 2px 6px rgba(0,0,0,.15)'};
-          cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;
-          font-size:9px;color:#fff;font-weight:700;flex-direction:column;gap:0px;
-          opacity:${isPending ? '0.75' : '1'};
-          transform:${isSecili ? 'scale(1.2)' : 'scale(1)'};transition:all .15s"
-          >
-          <span style="font-size:10px;font-weight:800;line-height:1">${actualHive.name}</span>
-          </div>`;
+        const isSecili = hive.id === krokiSeciliHiveId;
+        html += krokiHucreHTML(hive, isSecili);
       } else {
         html += `<div title="Sıra ${r+1}, Sağdan ${COLS-c} — Kovan ekle"
           onclick="krokidenKovanEkle(${r},${c})"
