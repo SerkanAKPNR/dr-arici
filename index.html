@@ -414,6 +414,17 @@
 
       <div class="sec-title">Arılık Ayarları</div>
       <div style="background:var(--white);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow)">
+        <div style="font-size:12px;color:var(--gray);margin-bottom:10px">Kroki boyutu</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+          <span style="font-size:13px;color:var(--brown2);min-width:36px">Satır</span>
+          <input type="number" id="set-rows" min="1" max="10" value="3"
+            style="width:70px;padding:8px 12px;border:1.5px solid var(--gray2);border-radius:8px;font-size:15px;text-align:center">
+          <span style="font-size:13px;color:var(--brown2);min-width:44px">Sütun</span>
+          <input type="number" id="set-cols" min="10" max="200" value="50"
+            style="width:80px;padding:8px 12px;border:1.5px solid var(--gray2);border-radius:8px;font-size:15px;text-align:center">
+          <button onclick="saveKrokiBoyutu()"
+            style="margin-left:auto;background:var(--amber);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-weight:700;cursor:pointer;font-size:13px">Kaydet</button>
+        </div>
         <div style="font-size:12px;color:var(--gray);margin-bottom:10px">Kovan başına çıta sayısı</div>
         <div style="display:flex;align-items:center;gap:10px">
           <input type="number" id="set-frames" min="5" max="20" value="10"
@@ -941,6 +952,8 @@ async function saveAyarlarToFirestore() {
     tipler: getTipler(),
     bannedNumbers: getBannedNumbers(),
     framesPerFloor: getFramesPerFloor(),
+    krokiRows: ROWS,
+    krokiCols: COLS,
   }, { merge: true });
 }
 
@@ -1523,6 +1536,8 @@ function renderSettings() {
   if (emailEl && currentUser) emailEl.textContent = currentUser.email || "—";
   const framesEl = $("set-frames");
   if (framesEl) framesEl.value = getFramesPerFloor();
+  const rowsEl = $("set-rows"); if (rowsEl) rowsEl.value = ROWS;
+  const colsEl = $("set-cols"); if (colsEl) colsEl.value = COLS;
   renderTabOrderList();
   renderGrupListesi();
   renderTipListesi();
@@ -1587,6 +1602,20 @@ function renderKatCitaText(h) {
     </div>` +
   `</div>`;
 }
+
+function saveKrokiBoyutu() {
+  const rows = parseInt($("set-rows").value);
+  const cols = parseInt($("set-cols").value);
+  if (!rows || rows < 1 || !cols || cols < 10) { showToast("Geçersiz değer!"); return; }
+  ROWS = rows; COLS = cols;
+  localStorage.setItem("kroki_rows", rows);
+  localStorage.setItem("kroki_cols", cols);
+  saveAyarlarToFirestore();
+  showToast(`✓ Kroki: ${rows} satır × ${cols} sütun`);
+  renderKroki();
+  renderMiniGrid();
+}
+window.saveKrokiBoyutu = saveKrokiBoyutu;
 
 function saveFramesSetting() {
   const val = parseInt($("set-frames").value);
@@ -2356,7 +2385,8 @@ async function topluKaydet() {
 }
 
 // ─── KROKI ───────────────────────────────────────────────────────
-const ROWS = 3, COLS = 50;
+let ROWS = parseInt(localStorage.getItem("kroki_rows") || "3");
+let COLS = parseInt(localStorage.getItem("kroki_cols") || "50");
 let selectedPos = null; // {row, col}
 
 function posKey(r, c) { return `${r}-${c}`; }
