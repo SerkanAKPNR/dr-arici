@@ -2454,7 +2454,8 @@ function renderKroki() {
           <span style="font-size:10px;font-weight:800;line-height:1">${actualHive.name}</span>
           </div>`;
       } else {
-        html += `<div title="Sıra ${r+1}, Sağdan ${COLS-c}"
+        html += `<div title="Sıra ${r+1}, Sağdan ${COLS-c} — Kovan ekle"
+          onclick="krokidenKovanEkle(${r},${c})"
           style="width:24px;height:36px;border-radius:4px;background:#F9FAFB;border:1.5px dashed #D1D5DB;
           cursor:pointer;flex-shrink:0;transition:background .15s"
           onmouseover="this.style.background='#FEF3C7'" onmouseout="this.style.background='#F9FAFB'"></div>`;
