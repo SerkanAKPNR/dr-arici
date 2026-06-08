@@ -458,13 +458,30 @@
       <div class="sec-title">Hesap</div>
       <div style="background:var(--white);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow)">
         <div style="font-size:13px;color:var(--gray);margin-bottom:12px" id="settings-email">—</div>
-        <button id="btn-logout" style="width:100%;padding:11px;border:1.5px solid var(--gray2);border-radius:10px;background:var(--white);cursor:pointer;font-size:14px;color:var(--brown2);font-family:inherit">🚪 Çıkış Yap</button>
+        <button onclick="cikisYap()" style="width:100%;padding:11px;border:1.5px solid var(--gray2);border-radius:10px;background:var(--white);cursor:pointer;font-size:14px;color:var(--brown2);font-family:inherit">🚪 Çıkış Yap</button>
       </div>
     </div>
   </div>
 
   <div class="content" id="tab-kroki" style="display:none">
     <div style="font-size:13px;color:var(--gray);margin-bottom:10px;text-align:center">Boş hücreye tıklayarak kovan yerleştirebilirsiniz</div>
+    <!-- Ok kontrol paneli -->
+    <div id="kroki-ok-panel" style="display:none;background:var(--white);border-radius:var(--radius);padding:12px;margin-bottom:10px;box-shadow:var(--shadow)">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div id="kroki-secili-bilgi" style="flex:1;font-size:14px;font-weight:700;color:var(--brown)"></div>
+        <div style="display:grid;grid-template-columns:repeat(3,36px);grid-template-rows:repeat(3,36px);gap:4px">
+          <div></div>
+          <button onclick="kovanTasi(0,-1)" style="background:var(--amber);color:#fff;border:none;border-radius:8px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center">⬆️</button>
+          <div></div>
+          <button onclick="kovanTasi(-1,0)" style="background:var(--amber);color:#fff;border:none;border-radius:8px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center">⬅️</button>
+          <button onclick="krokiSecimKaldir()" style="background:var(--gray2);color:var(--gray);border:none;border-radius:8px;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>
+          <button onclick="kovanTasi(1,0)" style="background:var(--amber);color:#fff;border:none;border-radius:8px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center">➡️</button>
+          <div></div>
+          <button onclick="kovanTasi(0,1)" style="background:var(--amber);color:#fff;border:none;border-radius:8px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center">⬇️</button>
+          <div></div>
+        </div>
+      </div>
+    </div>
     <div id="kroki-grid" style="overflow-x:auto;padding-bottom:8px"></div>
   </div>
 
@@ -2403,13 +2420,17 @@ function renderKroki() {
     for (let c = COLS-1; c >= 0; c--) {
       const hive = hiveAtPos(r, c);
       if (hive) {
+        const isSecili = hive.id === krokiSeciliHiveId;
         html += `<div onclick="selectHiveFromKroki('${hive.id}')"
           title="${hive.name}. Kovan — Sıra ${r+1}, Sağdan ${COLS-c}"
-          style="width:24px;height:36px;border-radius:4px;background:${hive.color||'#F59E0B'};border:2px solid ${hive.color||'#F59E0B'};
+          style="width:24px;height:36px;border-radius:4px;
+          background:${hive.color||'#F59E0B'};
+          border:${isSecili ? '3px solid #fff' : '2px solid ' + (hive.color||'#F59E0B')};
+          box-shadow:${isSecili ? '0 0 0 3px var(--brown), 0 4px 12px rgba(0,0,0,.3)' : '0 2px 6px rgba(0,0,0,.15)'};
           cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;
           font-size:9px;color:#fff;font-weight:700;flex-direction:column;gap:0px;
-          box-shadow:0 2px 6px rgba(0,0,0,.15);transition:transform .15s"
-          onmouseover="this.style.transform='scale(1.15)'" onmouseout="this.style.transform='scale(1)'">
+          transform:${isSecili ? 'scale(1.2)' : 'scale(1)'};transition:all .15s"
+          >
           <span style="font-size:10px;font-weight:800;line-height:1">${hive.name}</span>
           </div>`;
       } else {
@@ -2460,7 +2481,29 @@ window.selectPos = function(r, c) {
   renderMiniGrid();
 };
 
+let krokiSeciliHiveId = null;
+
 window.selectHiveFromKroki = function(id) {
+  // Kroki sekmesindeyse konum düzenleme modu
+  if (activeTab === "kroki") {
+    krokiSeciliHiveId = krokiSeciliHiveId === id ? null : id;
+    const hive = hives.find(h => h.id === krokiSeciliHiveId);
+    const panel = $("kroki-ok-panel");
+    const bilgi = $("kroki-secili-bilgi");
+    if (hive && panel && bilgi) {
+      panel.style.display = "block";
+      bilgi.textContent = `${hive.name}. Kovan seçili`;
+    } else if (panel) {
+      panel.style.display = "none";
+    }
+    renderKroki();
+    return;
+  }
+  // Diğer sekmelerden gelince popup aç (eski davranış)
+  krokiAyrintilariGoster(id);
+};
+
+function krokiAyrintilariGoster(id) {
   const hive = hives.find(h => h.id === id);
   if (!hive) return;
   const tasks = schedules.filter(s => s.hiveId === id && !s.done).length;
@@ -2760,7 +2803,94 @@ async function yedekYukle(event) {
 }
 
 
+
+window.krokiSecimKaldir = function() {
+  krokiSeciliHiveId = null;
+  const panel = $("kroki-ok-panel");
+  if (panel) panel.style.display = "none";
+  renderKroki();
+};
+
+window.kovanTasi = async function(rowDelta, colDelta) {
+  if (!krokiSeciliHiveId) return;
+  const hive = hives.find(h => h.id === krokiSeciliHiveId);
+  if (!hive || !hive.pos) { showToast("Bu kovanın kroki konumu yok!"); return; }
+
+  const yeniRow = hive.pos.row + rowDelta;
+  const yeniCol = hive.pos.col + colDelta;
+
+  if (yeniRow < 0 || yeniRow >= ROWS) { showToast("Sıra sınırı aşıldı!"); return; }
+  if (yeniCol < 0 || yeniCol >= COLS) { showToast("Kolon sınırı aşıldı!"); return; }
+
+  const hedef = hiveAtPos(yeniRow, yeniCol);
+
+  if (!hedef) {
+    // Hedef boş — direkt taşı
+    await updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${krokiSeciliHiveId}`), {
+      pos: { row: yeniRow, col: yeniCol }
+    });
+  } else {
+    // Hedef dolu — o yöndeki tüm kovanları birlikte kaydır
+    // Aynı sıradaki kovanları bul, o yönde sırala
+    const ayniSira = hives.filter(h => h.pos && h.pos.row === hive.pos.row);
+
+    // Hangi kovanlar kaydırılacak?
+    // colDelta > 0 (sağa): seçiliden sağdaki tüm kovanlar sağa kayar
+    // colDelta < 0 (sola): seçiliden soldaki tüm kovanlar sola kayar
+    // rowDelta kullanılmıyorsa (yukarı/aşağı) sadece tek kovan taşınır farklı sıraya
+    let kaydirilanlar = [];
+    if (colDelta !== 0) {
+      if (colDelta > 0) {
+        // Sağa: seçili kovan dahil sağındaki hepsi sağa kayar
+        kaydirilanlar = ayniSira
+          .filter(h => h.pos.col >= hive.pos.col)
+          .sort((a,b) => b.pos.col - a.pos.col); // en sağdakinden başla
+      } else {
+        // Sola: seçili kovan dahil solundaki hepsi sola kayar
+        kaydirilanlar = ayniSira
+          .filter(h => h.pos.col <= hive.pos.col)
+          .sort((a,b) => a.pos.col - b.pos.col); // en soldakinden başla
+      }
+
+      // Sınır kontrolü
+      for (const k of kaydirilanlar) {
+        const yeni = k.pos.col + colDelta;
+        if (yeni < 0 || yeni >= COLS) {
+          showToast("⚠️ Kaydırma yapılamıyor — sınır dışına çıkıyor!"); return;
+        }
+      }
+
+      // Onay sor
+      if (!confirm(`${kaydirilanlar.length} kovan birlikte ${colDelta > 0 ? "sağa" : "sola"} kayacak.\nDevam edilsin mi?`)) return;
+
+      // Hepsini güncelle
+      const batch = kaydirilanlar.map(k =>
+        updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${k.id}`), {
+          pos: { row: k.pos.row, col: k.pos.col + colDelta }
+        })
+      );
+      await Promise.all(batch);
+      showToast(`✓ ${kaydirilanlar.length} kovan kaydırıldı`);
+    } else {
+      // Yukarı/aşağı — farklı sırada dolu, uyar
+      showToast(`⚠️ Hedef konum dolu! (${hedef.name}. Kovan)`);
+      return;
+    }
+  }
+
+  // Bilgi panelini güncelle
+  const bilgi = $("kroki-secili-bilgi");
+  if (bilgi) bilgi.textContent = `${hive.name}. Kovan seçili`;
+};
+
 // ─── KOVAN KAYDIRMA ──────────────────────────────────────────────
+window.krokiSecimKaldir = krokiSecimKaldir;
+window.kovanTasi = kovanTasi;
+window.cikisYap = function() {
+  [_unsubAyarlar,_unsubHives,_unsubSchedules,_unsubRecords,_unsubGecmis].forEach(u=>u&&u());
+  signOut(auth);
+};
+
 window.kovanKaydirModal = function(sira) {
   const siraKovanlar = hives.filter(h => h.pos && h.pos.row === sira);
   if (!siraKovanlar.length) { showToast("Bu sırada konum atanmış kovan yok"); return; }
