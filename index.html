@@ -1416,7 +1416,7 @@ function updateFabVisibility() {
 // Tab tanımları
 const TAB_DEFS = [
   { key: "home",     label: "🏡 Ana Sayfa" },
-  { key: "hives",    label: "🏠 Kovanlar" },
+  { key: "hives",    label: "🏠 Koloniler" },
   { key: "kroki",    label: "🗺️ Kroki" },
   { key: "schedule", label: "📋 Takvim" },
   { key: "records",  label: "📝 Kayıtlar" },
@@ -1843,16 +1843,15 @@ function renderHiveNotes(h) {
       <button onclick="notEkleAc('${h.id}')" style="font-size:12px;color:var(--amber);background:none;border:1px dashed var(--amber);border-radius:8px;padding:4px 10px;cursor:pointer;font-family:inherit">📝 Not Ekle</button>
     </div>`;
   }
+  const sonNot = notlar[0];
   return `<div style="margin-top:8px;border-top:1px dashed var(--gray2);padding-top:8px">
-    ${notlar.map((n, i) => `
-      <div style="display:flex;gap:8px;align-items:flex-start;padding:5px 0;border-bottom:1px solid var(--gray2)">
-        <div style="flex:1">
-          <div style="font-size:11px;color:var(--amber);font-weight:600;margin-bottom:2px">${n.tarih}</div>
-          <div style="font-size:13px;color:var(--brown2)">${n.metin}</div>
-        </div>
-        <button onclick="hiveNotSil('${h.id}',${notlar.length-1-i})" style="background:none;border:none;color:var(--gray);cursor:pointer;font-size:14px;flex-shrink:0">🗑️</button>
-      </div>`).join("")}
-    <button onclick="notEkleAc('${h.id}')" style="margin-top:6px;font-size:12px;color:var(--amber);background:none;border:1px dashed var(--amber);border-radius:8px;padding:4px 10px;cursor:pointer;font-family:inherit">+ Not Ekle</button>
+    <div style="display:flex;gap:8px;align-items:flex-start">
+      <div style="flex:1;cursor:pointer" onclick="notlarModalAc('${h.id}')">
+        <div style="font-size:11px;color:var(--amber);font-weight:600;margin-bottom:2px">${sonNot.tarih} ${notlar.length > 1 ? `<span style="color:var(--gray)">(+${notlar.length-1} not daha)</span>` : ''}</div>
+        <div style="font-size:13px;color:var(--brown2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${sonNot.metin}</div>
+      </div>
+      <button onclick="notEkleAc('${h.id}')" style="font-size:12px;color:var(--amber);background:none;border:1px dashed var(--amber);border-radius:8px;padding:4px 8px;cursor:pointer;font-family:inherit;flex-shrink:0">+</button>
+    </div>
   </div>`;
 }
 
@@ -2820,6 +2819,69 @@ async function yedekYukle(event) {
 }
 
 
+
+
+window.krokidenKovanEkle = function(row, col) {
+  editingHiveId = null;
+  $("hive-modal-title").textContent = "🐝 Yeni Kovan";
+  ["hive-breed","hive-queen"].forEach(id => $(id).value = "");
+  populateHiveOriginSelect("hive-origin", "");
+  populateGroupSelect("hive-group", "");
+  const nextNum = getNextHiveNumber();
+  $("hive-name").value = nextNum;
+  const hint = $("hive-name-hint");
+  if (hint) hint.textContent = "Önerilen numara: " + nextNum;
+  populateHiveTypeSelect("Langstroth");
+  $("hive-floors").value = "1";
+  $("hive-strength").value = 5; $("hive-strength-val").textContent = 5;
+  selectedPos = { row, col };
+  updatePosLabel();
+  renderMiniGrid();
+  renderColorPicker(HIVE_COLORS[0]);
+  openModal("modal-hive");
+  setTimeout(() => renderKatCitaFields(), 50);
+};
+
+
+window.notlarModalAc = function(hiveId) {
+  const hive = hives.find(h => h.id === hiveId);
+  if (!hive) return;
+  const notlar = (hive.notlar || []).slice().reverse();
+  $("kovan-detay-icerik").innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+      <div style="flex:1">
+        <div style="font-family:'Playfair Display',serif;font-size:18px;color:var(--brown);font-weight:700">${hive.name}. Kovan — Notlar</div>
+      </div>
+      <button onclick="closeModal('modal-kovan-detay')" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--gray)">✕</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">
+      ${notlar.map((n, i) => `
+        <div style="background:var(--cream2);border-radius:10px;padding:10px 12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <span style="font-size:11px;color:var(--amber);font-weight:600">${n.tarih}</span>
+            <button onclick="hiveNotSil('${hiveId}',${notlar.length-1-i});closeModal('modal-kovan-detay')" style="background:none;border:none;color:var(--gray);cursor:pointer;font-size:13px">🗑️</button>
+          </div>
+          <div style="font-size:14px;color:var(--brown2)">${n.metin}</div>
+        </div>`).join("")}
+    </div>
+    <button onclick="closeModal('modal-kovan-detay');notEkleAc('${hiveId}')"
+      style="width:100%;padding:11px;background:var(--amber);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">
+      📝 Yeni Not Ekle
+    </button>`;
+  openModal("modal-kovan-detay");
+};
+
+window.krokiTasiModuBaslat = function(id) {
+  krokiSeciliHiveId = id;
+  const hive = hives.find(h => h.id === id);
+  const panel = $("kroki-ok-panel");
+  const bilgi = $("kroki-secili-bilgi");
+  if (hive && panel && bilgi) {
+    panel.style.display = "block";
+    bilgi.textContent = `${hive.name}. Kovan seçili — ok tuşlarıyla taşı`;
+  }
+  renderKroki();
+};
 
 window.krokiSecimKaldir = function() {
   krokiSeciliHiveId = null;
