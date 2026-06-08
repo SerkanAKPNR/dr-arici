@@ -479,9 +479,9 @@
           <div></div>
           <button onclick="kovanTasi(0,-1)" style="background:var(--amber);color:#fff;border:none;border-radius:8px;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center">⬆️</button>
           <div></div>
-          <button onclick="kovanTasi(-1,0)" style="background:var(--amber);color:#fff;border:none;border-radius:8px;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center">⬅️</button>
+          <button onclick="kovanTasi(0,1)" style="background:var(--amber);color:#fff;border:none;border-radius:8px;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center">⬅️</button>
           <div style="background:var(--cream2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px">🐝</div>
-          <button onclick="kovanTasi(1,0)" style="background:var(--amber);color:#fff;border:none;border-radius:8px;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center">➡️</button>
+          <button onclick="kovanTasi(0,-1)" style="background:var(--amber);color:#fff;border:none;border-radius:8px;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center">➡️</button>
           <div></div>
           <button onclick="kovanTasi(0,1)" style="background:var(--amber);color:#fff;border:none;border-radius:8px;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center">⬇️</button>
           <div></div>
@@ -2362,17 +2362,16 @@ let selectedPos = null; // {row, col}
 
 function posKey(r, c) { return `${r}-${c}`; }
 function hiveAtPos(r, c) {
-  // Pending pozisyon varsa onu kullan
-  const pendingHive = hives.find(h => {
-    const p = pendingPos[h.id];
-    return p && p.row === r && p.col === c;
-  });
-  if (pendingHive) return pendingHive;
-  // Pending'de farklı yere taşınmış kovanı eski konumunda gösterme
-  return hives.find(h => {
-    if (pendingPos[h.id]) return false; // pending'de olan eski yerinde görünmesin
-    return h.pos && h.pos.row === r && h.pos.col === c;
-  });
+  // Seçili kovan pending konumdaysa oraya çiz, eski yerini boş göster
+  if (krokiSeciliHiveId && pendingPos[krokiSeciliHiveId]) {
+    const p = pendingPos[krokiSeciliHiveId];
+    const h = hives.find(x => x.id === krokiSeciliHiveId);
+    // Eski konumunu boş göster
+    if (h && h.pos && h.pos.row === r && h.pos.col === c) return null;
+    // Yeni konumuna çiz
+    if (p.row === r && p.col === c) return h;
+  }
+  return hives.find(h => h.pos && h.pos.row === r && h.pos.col === c);
 }
 
 function updatePosLabel() {
@@ -2438,14 +2437,9 @@ function renderKroki() {
     for (let c = COLS-1; c >= 0; c--) {
       const hive = hiveAtPos(r, c);
       if (hive) {
-        // Pending pozisyon varsa onu kullan
-        const displayHive = Object.entries(pendingPos).find(([id]) => {
-          const ph = pendingPos[id];
-          return ph && ph.row === r && ph.col === c;
-        });
-        const actualHive = displayHive ? hives.find(h => h.id === displayHive[0]) : hive;
+        const actualHive = hive;
         const isSecili = actualHive && actualHive.id === krokiSeciliHiveId;
-        const isPending = displayHive && !isSecili;
+        const isPending = false;
         html += `<div onclick="selectHiveFromKroki('${actualHive.id}')"
           title="${hive.name}. Kovan — Sıra ${r+1}, Sağdan ${COLS-c}"
           style="width:24px;height:36px;border-radius:4px;
@@ -2839,78 +2833,110 @@ window.krokiSecimKaldir = function() {
   renderKroki();
 };
 
-// pendingPos: taşıma önizlemesi {hiveId: {row, col}}
+// pendingPos: sadece seçili kovanın yeni konumu {row, col}
 let pendingPos = {};
-let originalPos = {};
+let originalPos = {};  // seçili kovanın orijinal konumu
 
-window.kovanTasi = function(rowDelta, colDelta) {
+window.kovanTasi = async function(rowDelta, colDelta) {
   if (!krokiSeciliHiveId) return;
-
-  // Mevcut pozisyonları al (pending varsa onu, yoksa gerçek pozisyonu)
-  const getPoz = (id) => pendingPos[id] || hives.find(h => h.id === id)?.pos;
 
   const hive = hives.find(h => h.id === krokiSeciliHiveId);
   if (!hive) return;
 
-  // Başlangıç pozisyonlarını sakla (ilk harekette)
-  if (Object.keys(originalPos).length === 0) {
-    hives.forEach(h => { if (h.pos) originalPos[h.id] = {...h.pos}; });
+  // Orijinal konumu sakla (ilk harekette)
+  if (!originalPos[krokiSeciliHiveId]) {
+    originalPos[krokiSeciliHiveId] = hive.pos ? {...hive.pos} : null;
   }
 
-  const mevcutPoz = getPoz(krokiSeciliHiveId);
+  // Mevcut pending konum
+  const mevcutPoz = pendingPos[krokiSeciliHiveId] || hive.pos;
   if (!mevcutPoz) { showToast("Bu kovanın kroki konumu yok!"); return; }
 
   const yeniRow = mevcutPoz.row + rowDelta;
-  let yeniCol = mevcutPoz.col + colDelta;
+  const yeniCol = mevcutPoz.col + colDelta;
 
-  // Sıra sınırı kontrolü (yukarı/aşağı)
+  // Sınır kontrolü
   if (yeniRow < 0 || yeniRow >= ROWS) { showToast("Sıra sınırı aşıldı!"); return; }
+  if (yeniCol < 0 || yeniCol >= COLS) { showToast("Kolon sınırı aşıldı!"); return; }
 
-  // Pending pozisyonla haritayı oluştur
-  const harita = {}; // "row-col" → hiveId
-  hives.forEach(h => {
-    const p = pendingPos[h.id] || h.pos;
-    if (p && h.id !== krokiSeciliHiveId) harita[`${p.row}-${p.col}`] = h.id;
-  });
+  // Hedef dolu mu? (seçili kovan hariç)
+  const digerKovanlar = hives.filter(h =>
+    h.id !== krokiSeciliHiveId && h.pos && h.pos.row === yeniRow
+  );
+  const hedef = digerKovanlar.find(h => h.pos.col === yeniCol);
 
-  // Cascade: yeni konumda kovan varsa onu da kaydır
-  const tasinacaklar = [{id: krokiSeciliHiveId, row: yeniRow, col: yeniCol}];
-
-  // Colona hareket ediyorsak cascade uygula
-  if (colDelta !== 0) {
-    let col = yeniCol;
-    while (harita[`${yeniRow}-${col}`]) {
-      const engel = harita[`${yeniRow}-${col}`];
-      col += colDelta;
-      tasinacaklar.push({id: engel, row: yeniRow, col});
+  if (hedef) {
+    // Dolu hücre — o yönde ilk boşluğu bul
+    // colDelta ile aynı yönde ara, rowDelta ise herhangi yöne
+    const yon = colDelta !== 0 ? colDelta : (yeniCol > mevcutPoz.col ? 1 : -1);
+    let boslukCol = -1;
+    for (let c = yeniCol + yon; c >= 0 && c < COLS; c += yon) {
+      const dolu = digerKovanlar.find(h => h.pos.col === c);
+      if (!dolu) { boslukCol = c; break; }
     }
-  } else {
-    // Yukarı/aşağı — hedef doluysa sadece uyar
-    if (harita[`${yeniRow}-${yeniCol}`]) {
-      showToast("Hedef dolu!"); return;
-    }
+
+    if (boslukCol === -1) { showToast("Bu satırda boş yer yok!"); return; }
+
+    const kacKovan = Math.abs(boslukCol - yeniCol);
+    if (!confirm(`Bu konumda kovan var!\n\n${kacKovan} kovan ${yon > 0 ? "sağa" : "sola"} kaydırılacak.\nDevam edilsin mi?`)) return;
+
+    // Kaydırılacak kovanları bul (yeniCol ile boslukCol arasındakiler)
+    const kaydirilanlar = digerKovanlar
+      .filter(h => {
+        const c = h.pos.col;
+        return yon > 0 ? (c >= yeniCol && c < boslukCol) : (c <= yeniCol && c > boslukCol);
+      })
+      .sort((a,b) => yon > 0 ? b.pos.col - a.pos.col : a.pos.col - b.pos.col);
+
+    // Firestore'da kaydır
+    const batch = kaydirilanlar.map(h =>
+      updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${h.id}`), {
+        pos: { row: yeniRow, col: h.pos.col + yon }
+      })
+    );
+    await Promise.all(batch);
   }
 
-  // Tüm yeni pozisyonları pending'e kaydet
-  tasinacaklar.forEach(t => { pendingPos[t.id] = {row: t.row, col: t.col}; });
+  // Boş hücre — oraya taşı (kaydırmadan sonra da boş)
+  pendingPos[krokiSeciliHiveId] = {row: yeniRow, col: yeniCol};
 
   // Bilgi güncelle
   const bilgi = $("kroki-secili-bilgi");
-  const poz = pendingPos[krokiSeciliHiveId];
-  const etkilenen = Object.keys(pendingPos).length;
-  if (bilgi) bilgi.textContent = `${hive.name}. Kovan → Sıra ${poz.row+1}, Sağdan ${COLS-poz.col}${etkilenen > 1 ? ` (${etkilenen} kovan etkilendi)` : ""}`;
+  if (bilgi) bilgi.textContent = `${hive.name}. Kovan → Sıra ${yeniRow+1}, Sağdan ${COLS-yeniCol}`;
 
   renderKroki();
+
+  // Seçili kovanı görünür alana getir
+  setTimeout(() => {
+    const grid = $("kroki-grid");
+    if (!grid) return;
+    const gorselKolon = COLS - 1 - yeniCol;
+    const hucreGenislik = 28;
+    const sol = gorselKolon * hucreGenislik + 22; // 22 = satır numarası genişliği
+    const genisBant = grid.clientWidth;
+    const mevcutScroll = grid.scrollLeft;
+    if (sol < mevcutScroll + 30 || sol + hucreGenislik > mevcutScroll + genisBant - 30) {
+      grid.scrollTo({ left: sol - genisBant/2 + hucreGenislik/2, behavior: "smooth" });
+    }
+  }, 50);
 };
 
 async function kovanTasiKaydet() {
-  if (!Object.keys(pendingPos).length) { krokiSecimKaldir(); return; }
-  const batch = Object.entries(pendingPos).map(([id, pos]) =>
-    updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${id}`), { pos })
+  const yeniPoz = pendingPos[krokiSeciliHiveId];
+  if (!yeniPoz) { krokiSecimKaldir(); return; }
+
+  // Son kontrol: hedef hala boş mu?
+  const hedef = hives.find(h =>
+    h.id !== krokiSeciliHiveId &&
+    h.pos && h.pos.row === yeniPoz.row && h.pos.col === yeniPoz.col
   );
-  await Promise.all(batch);
-  const sayi = Object.keys(pendingPos).length;
-  showToast(`✓ ${sayi} kovan güncellendi`);
+  if (hedef) {
+    showToast("⚠️ Hedef konum dolu, taşıma yapılamaz!");
+    return;
+  }
+
+  await updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${krokiSeciliHiveId}`), { pos: yeniPoz });
+  showToast("✓ Kovan taşındı");
   pendingPos = {};
   originalPos = {};
   krokiSeciliHiveId = null;
