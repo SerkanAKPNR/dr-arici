@@ -2608,7 +2608,7 @@ function krokiAyrintilariGoster(id, krokiMod) {
       </div>
       <div style="background:var(--cream2);border-radius:10px;padding:10px 12px">
         <div style="font-size:11px;color:var(--gray);margin-bottom:4px">🏠 Kat / Çıta</div>
-        <div style="font-weight:700;color:var(--brown)">${hive.floors||1} kat · ${frames} çıta</div>
+        <div style="font-size:12px">${renderKatCitaText(hive)}</div>
       </div>
       <div style="background:var(--cream2);border-radius:10px;padding:10px 12px">
   
@@ -3198,6 +3198,7 @@ window.hiveNotSil = hiveNotSil;
 window.renderHiveNotes = renderHiveNotes;
 window.renderGelir = renderGelir;
 window.updateFabVisibility = updateFabVisibility;
+window.renderHives = renderHives;
 window.isletmeyeGir = isletmeyeGir;
 window.yeniIsletmeEkle = yeniIsletmeEkle;
 window.gelirKaydet = gelirKaydet;
