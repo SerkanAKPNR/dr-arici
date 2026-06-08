@@ -131,7 +131,7 @@
     background: var(--amber); color: var(--white); border: none; border-radius: 50%;
     font-size: 26px; cursor: pointer; box-shadow: 0 6px 20px rgba(217,119,6,.4);
     display: flex; align-items: center; justify-content: center;
-    transition: transform .2s, box-shadow .2s; z-index: 30;
+    transition: transform .2s, box-shadow .2s; z-index: 100;
   }
   .fab:hover { transform: scale(1.08); box-shadow: 0 8px 28px rgba(217,119,6,.5); }
 
@@ -425,6 +425,17 @@
           <button onclick="saveKrokiBoyutu()"
             style="margin-left:auto;background:var(--amber);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-weight:700;cursor:pointer;font-size:13px">Kaydet</button>
         </div>
+        <div style="font-size:12px;color:var(--gray);margin:10px 0 6px">👑 Kraliçe kutusu boyutu</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:13px;color:var(--brown2);min-width:36px">Satır</span>
+          <input type="number" id="set-qrows" min="1" max="10" value="2"
+            style="width:70px;padding:8px 12px;border:1.5px solid var(--gray2);border-radius:8px;font-size:15px;text-align:center">
+          <span style="font-size:13px;color:var(--brown2);min-width:44px">Sütun</span>
+          <input type="number" id="set-qcols" min="5" max="100" value="20"
+            style="width:80px;padding:8px 12px;border:1.5px solid var(--gray2);border-radius:8px;font-size:15px;text-align:center">
+          <button onclick="saveQueenBoyutu()"
+            style="margin-left:auto;background:var(--amber);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-weight:700;cursor:pointer;font-size:13px">Kaydet</button>
+        </div>
         <div style="font-size:12px;color:var(--gray);margin-bottom:10px">Kovan başına çıta sayısı</div>
         <div style="display:flex;align-items:center;gap:10px">
           <input type="number" id="set-frames" min="5" max="20" value="10"
@@ -500,6 +511,36 @@
       </div>
     </div>
     <div id="kroki-grid" style="overflow-x:auto;padding-bottom:8px"></div>
+
+    <!-- Kraliçe Kutuları -->
+    <div style="margin-top:20px;border-top:2px dashed var(--amber3);padding-top:14px">
+      <div style="font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:var(--brown);margin-bottom:10px">
+        👑 Kraliçe Kutuları
+      </div>
+      <div id="queen-ok-panel" style="display:none;background:var(--white);border-radius:var(--radius);padding:12px;margin-bottom:10px;box-shadow:var(--shadow)">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="flex:1">
+            <div id="queen-secili-bilgi" style="font-size:14px;font-weight:700;color:var(--brown);margin-bottom:6px"></div>
+            <div style="display:flex;gap:6px">
+              <button onclick="queenTasiKaydet()" style="flex:1;background:var(--green2);color:#fff;border:none;border-radius:8px;padding:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">✅ Tamam</button>
+              <button onclick="queenSecimKaldir()" style="flex:1;background:var(--gray2);color:var(--gray);border:none;border-radius:8px;padding:8px;font-size:13px;cursor:pointer;font-family:inherit">❌ İptal</button>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3,40px);grid-template-rows:repeat(3,40px);gap:4px">
+            <div></div>
+            <button onclick="queenTasi(0,-1)" style="background:var(--amber);color:#fff;border:none;border-radius:8px;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center">⬆️</button>
+            <div></div>
+            <button onclick="queenTasi(0,1)" style="background:var(--amber);color:#fff;border:none;border-radius:8px;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center">⬅️</button>
+            <div style="background:var(--cream2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px">👑</div>
+            <button onclick="queenTasi(0,-1)" style="background:var(--amber);color:#fff;border:none;border-radius:8px;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center">➡️</button>
+            <div></div>
+            <button onclick="queenTasi(0,1)" style="background:var(--amber);color:#fff;border:none;border-radius:8px;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center">⬇️</button>
+            <div></div>
+          </div>
+        </div>
+      </div>
+      <div id="queen-grid" style="overflow-x:auto;padding-bottom:8px"></div>
+    </div>
   </div>
 
   <button class="fab" id="fab-btn">+</button>
@@ -954,6 +995,8 @@ async function saveAyarlarToFirestore() {
     framesPerFloor: getFramesPerFloor(),
     krokiRows: ROWS,
     krokiCols: COLS,
+    queenRows: QROWS,
+    queenCols: QCOLS,
   }, { merge: true });
 }
 
@@ -1278,6 +1321,7 @@ $("hive-save").onclick = async () => {
     name,
     group: $("hive-group").value || null,
     originHiveId: $("hive-origin").value || null,
+    qpos: (window._queenPos && !selectedPos) ? window._queenPos : null,
     type: $("hive-type").value,
     breed: $("hive-breed").value.trim(),
     queen: $("hive-queen").value,
@@ -1371,7 +1415,7 @@ document.querySelectorAll(".tab").forEach(btn => {
     $("tab-records").style.display  = activeTab === "records"  ? "" : "none";
     $("tab-kroki").style.display    = activeTab === "kroki"    ? "" : "none";
     $("tab-settings").style.display = activeTab === "settings" ? "" : "none";
-    if (activeTab === "kroki") renderKroki();
+    if (activeTab === "kroki") { renderKroki(); renderQueenKroki(); }
     if (activeTab === "settings") renderSettings();
   };
 });
@@ -1401,6 +1445,7 @@ $("fab-btn").onclick = () => {
     $("hive-floors").value = "1";
     $("hive-strength").value = 5; $("hive-strength-val").textContent = 5;
     selectedPos = null;
+    window._queenPos = null;
     updatePosLabel();
     renderMiniGrid();
     renderColorPicker(HIVE_COLORS[0]);
@@ -1479,7 +1524,7 @@ function applyTabOrder(order) {
       $("tab-gelir").style.display    = activeTab === "gelir"    ? "" : "none";
       $("tab-kroki").style.display    = activeTab === "kroki"    ? "" : "none";
       $("tab-settings").style.display = activeTab === "settings" ? "" : "none";
-      if (activeTab === "kroki") renderKroki();
+      if (activeTab === "kroki") { renderKroki(); renderQueenKroki(); }
       if (activeTab === "settings") renderSettings();
       if (activeTab === "home") renderHome();
       updateFabVisibility();
@@ -1538,6 +1583,8 @@ function renderSettings() {
   if (framesEl) framesEl.value = getFramesPerFloor();
   const rowsEl = $("set-rows"); if (rowsEl) rowsEl.value = ROWS;
   const colsEl = $("set-cols"); if (colsEl) colsEl.value = COLS;
+  const qrowsEl = $("set-qrows"); if (qrowsEl) qrowsEl.value = QROWS;
+  const qcolsEl = $("set-qcols"); if (qcolsEl) qcolsEl.value = QCOLS;
   renderTabOrderList();
   renderGrupListesi();
   renderTipListesi();
@@ -2387,6 +2434,8 @@ async function topluKaydet() {
 // ─── KROKI ───────────────────────────────────────────────────────
 let ROWS = parseInt(localStorage.getItem("kroki_rows") || "3");
 let COLS = parseInt(localStorage.getItem("kroki_cols") || "50");
+let QROWS = parseInt(localStorage.getItem("queen_rows") || "2");
+let QCOLS = parseInt(localStorage.getItem("queen_cols") || "20");
 let selectedPos = null; // {row, col}
 
 function posKey(r, c) { return `${r}-${c}`; }
@@ -2687,6 +2736,7 @@ document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.da
 ["tab-home","tab-hives","tab-schedule","tab-records","tab-gecmis","tab-gelir","tab-kroki","tab-settings"].forEach(id => {
   const el = $(id); if(el) el.style.display = id === "tab-home" ? "" : "none";
 });
+updateFabVisibility();
 
 // Close modals on overlay click
 ["modal-hive","modal-sched","modal-rec","modal-kovan-detay","modal-kovan-islem","modal-hive-not"].forEach(id => {
@@ -3056,6 +3106,140 @@ window.kovanTasi = kovanTasi;
 window.cikisYap = function() {
   [_unsubAyarlar,_unsubHives,_unsubSchedules,_unsubRecords,_unsubGecmis].forEach(u=>u&&u());
   signOut(auth);
+};
+
+
+// ─── KRALİÇE KUTUSU KROKİ ────────────────────────────────────────
+let queenSeciliHiveId = null;
+let queenPendingPos = {};
+let queenOriginalPos = {};
+
+function qhiveAtPos(r, c) {
+  if (queenSeciliHiveId && queenPendingPos[queenSeciliHiveId]) {
+    const p = queenPendingPos[queenSeciliHiveId];
+    const h = hives.find(x => x.id === queenSeciliHiveId);
+    if (h && h.qpos && h.qpos.row === r && h.qpos.col === c) return null;
+    if (p.row === r && p.col === c) return h;
+  }
+  return hives.find(h => h.qpos && h.qpos.row === r && h.qpos.col === c);
+}
+
+function renderQueenKroki() {
+  const el = $("queen-grid");
+  if (!el) return;
+  let html = `<div style="display:flex;flex-direction:column;gap:6px;min-width:${QCOLS*28+24}px">`;
+  html += `<div style="display:flex;gap:4px;padding-left:22px">`;
+  for (let c = QCOLS-1; c >= 0; c--) {
+    html += `<div style="width:24px;text-align:center;font-size:9px;color:var(--gray);flex-shrink:0">${QCOLS-c}</div>`;
+  }
+  html += `</div>`;
+  for (let r = 0; r < QROWS; r++) {
+    html += `<div style="display:flex;gap:4px;align-items:center">`;
+    html += `<span style="font-size:11px;font-weight:700;color:var(--brown2);width:18px;flex-shrink:0">${r+1}</span>`;
+    for (let c = QCOLS-1; c >= 0; c--) {
+      const hive = qhiveAtPos(r, c);
+      if (hive) {
+        const isSecili = hive.id === queenSeciliHiveId;
+        html += krokiHucreHTML(hive, isSecili);
+      } else {
+        html += `<div onclick="queendenKovanEkle(${r},${c})" title="Sıra ${r+1}, Sağdan ${QCOLS-c}"
+          style="width:24px;height:36px;border-radius:4px;background:#FFF9E6;border:1.5px dashed var(--amber3);
+          cursor:pointer;flex-shrink:0;transition:background .15s"
+          onmouseover="this.style.background='#FEF3C7'" onmouseout="this.style.background='#FFF9E6'"></div>`;
+      }
+    }
+    html += `</div>`;
+  }
+  html += `</div>`;
+  el.innerHTML = html;
+}
+window.renderQueenKroki = renderQueenKroki;
+
+window.queendenKovanEkle = function(row, col) {
+  editingHiveId = null;
+  $("hive-modal-title").textContent = "👑 Kraliçe Kutusuna Ekle";
+  ["hive-breed","hive-queen"].forEach(id => $(id).value = "");
+  populateHiveOriginSelect("hive-origin", "");
+  populateGroupSelect("hive-group", "");
+  const nextNum = getNextHiveNumber();
+  $("hive-name").value = nextNum;
+  const hint = $("hive-name-hint");
+  if (hint) hint.textContent = "Önerilen numara: " + nextNum;
+  populateHiveTypeSelect("Langstroth");
+  $("hive-floors").value = "1";
+  $("hive-strength").value = 5; $("hive-strength-val").textContent = 5;
+  window._queenPos = {row, col};
+  selectedPos = null;
+  updatePosLabel();
+  renderMiniGrid();
+  renderColorPicker(HIVE_COLORS[0]);
+  openModal("modal-hive");
+  setTimeout(() => renderKatCitaFields(), 50);
+};
+
+window.queenSecimKaldir = function() {
+  queenSeciliHiveId = null;
+  queenPendingPos = {};
+  const panel = $("queen-ok-panel");
+  if (panel) panel.style.display = "none";
+  renderQueenKroki();
+};
+
+window.queenTasiKaydet = async function() {
+  const yeniPoz = queenPendingPos[queenSeciliHiveId];
+  if (!yeniPoz) { queenSecimKaldir(); return; }
+  await updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${queenSeciliHiveId}`), { qpos: yeniPoz });
+  showToast("✓ Kraliçe kutusu konumu güncellendi");
+  queenPendingPos = {}; queenOriginalPos = {};
+  queenSeciliHiveId = null;
+  const panel = $("queen-ok-panel");
+  if (panel) panel.style.display = "none";
+};
+
+window.queenTasi = async function(rowDelta, colDelta) {
+  if (!queenSeciliHiveId) return;
+  const hive = hives.find(h => h.id === queenSeciliHiveId);
+  if (!hive) return;
+  const mevcut = queenPendingPos[queenSeciliHiveId] || hive.qpos;
+  if (!mevcut) { showToast("Kraliçe kutusu konumu yok!"); return; }
+  const yeniRow = mevcut.row + rowDelta;
+  const yeniCol = mevcut.col + colDelta;
+  if (yeniRow < 0 || yeniRow >= QROWS) { showToast("Sıra sınırı!"); return; }
+  if (yeniCol < 0 || yeniCol >= QCOLS) { showToast("Kolon sınırı!"); return; }
+  const hedef = hives.find(h => h.id !== queenSeciliHiveId && h.qpos && h.qpos.row === yeniRow && h.qpos.col === yeniCol);
+  if (hedef) {
+    const digerKovanlar = hives.filter(h => h.id !== queenSeciliHiveId && h.qpos && h.qpos.row === yeniRow);
+    const itmeYonu = -colDelta || 1;
+    let boslukCol = -1;
+    for (let c = yeniCol + itmeYonu; c >= 0 && c < QCOLS; c += itmeYonu) {
+      if (!digerKovanlar.find(h => h.qpos.col === c)) { boslukCol = c; break; }
+    }
+    if (boslukCol === -1) { showToast("Yer yok!"); return; }
+    const aralik = itmeYonu > 0
+      ? digerKovanlar.filter(h => h.qpos.col >= yeniCol && h.qpos.col < boslukCol)
+      : digerKovanlar.filter(h => h.qpos.col <= yeniCol && h.qpos.col > boslukCol);
+    if (!confirm(aralik.length + " kovan kaydırılacak. Devam?")) return;
+    await Promise.all(aralik.map(h => updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${h.id}`), { qpos: { row: yeniRow, col: h.qpos.col + itmeYonu } })));
+  }
+  queenPendingPos[queenSeciliHiveId] = {row: yeniRow, col: yeniCol};
+  $("queen-secili-bilgi").textContent = hive.name + ". Kovan → Sıra " + (yeniRow+1) + ", Sağdan " + (QCOLS-yeniCol);
+  renderQueenKroki();
+};
+
+function saveQueenBoyutu() {
+  const rows = parseInt($("set-qrows").value);
+  const cols = parseInt($("set-qcols").value);
+  if (!rows || !cols) { showToast("Geçersiz!"); return; }
+  QROWS = rows; QCOLS = cols;
+  localStorage.setItem("queen_rows", rows);
+  localStorage.setItem("queen_cols", cols);
+  saveAyarlarToFirestore();
+  showToast("Kraliçe kutusu: " + rows + "x" + cols);
+  renderQueenKroki();
+}
+window.saveQueenBoyutu = saveQueenBoyutu;
+window.queenHiveTikla = function(id) {
+  krokiAyrintilariGoster(id, false);
 };
 
 window.kovanKaydirModal = function(sira) {
