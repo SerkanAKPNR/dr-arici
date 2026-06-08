@@ -1359,21 +1359,22 @@ $("fab-btn").onclick = () => {
     renderColorPicker(HIVE_COLORS[0]);
     openModal("modal-hive");
     setTimeout(() => renderKatCitaFields(), 50);
-  } else if (activeTab === "kroki" || activeTab === "settings" || activeTab === "home") {
-    return;
-  } else if (activeTab === "schedule") {
-    populateHiveSelects();
-    $("sched-date").value = today();
-    $("sched-drug").value = ""; $("sched-note").value = "";
-    openModal("modal-sched");
-  } else {
+  } else if (activeTab === "records") {
     populateHiveSelects();
     $("rec-date").value = today();
     $("rec-note").value = ""; $("rec-winter").value = "";
     $("rec-origin").value = "";
     openModal("modal-rec");
   }
+  // Diğer sekmelerde FAB görünmüyor zaten
 };
+
+// FAB görünürlüğünü sekmeye göre ayarla
+function updateFabVisibility() {
+  const fab = $("fab-btn");
+  if (!fab) return;
+  fab.style.display = ["hives","records"].includes(activeTab) ? "flex" : "none";
+}
 
 
 
@@ -1434,6 +1435,7 @@ function applyTabOrder(order) {
       if (activeTab === "kroki") renderKroki();
       if (activeTab === "settings") renderSettings();
       if (activeTab === "home") renderHome();
+      updateFabVisibility();
     };
   });
 }
@@ -2551,6 +2553,7 @@ function switchTab(key) {
   if (activeTab === "home") renderHome();
   if (activeTab === "gecmis") renderGecmis();
   if (activeTab === "gelir") renderGelir();
+  updateFabVisibility();
 }
 
 // Başlangıçta kayıtlı sekme sırası uygula
@@ -2816,6 +2819,7 @@ window.hiveNotKaydet = hiveNotKaydet;
 window.hiveNotSil = hiveNotSil;
 window.renderHiveNotes = renderHiveNotes;
 window.renderGelir = renderGelir;
+window.updateFabVisibility = updateFabVisibility;
 window.isletmeyeGir = isletmeyeGir;
 window.yeniIsletmeEkle = yeniIsletmeEkle;
 window.gelirKaydet = gelirKaydet;
