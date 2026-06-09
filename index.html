@@ -3004,12 +3004,10 @@ window.kovanTasi = async function(rowDelta, colDelta) {
   const hive = hives.find(h => h.id === krokiSeciliHiveId);
   if (!hive) return;
 
-  // Orijinal konumu sakla (ilk harekette)
   if (!originalPos[krokiSeciliHiveId]) {
     originalPos[krokiSeciliHiveId] = hive.pos ? {...hive.pos} : null;
   }
 
-  // Mevcut pending konum
   const mevcutPoz = pendingPos[krokiSeciliHiveId] || hive.pos;
   if (!mevcutPoz) { showToast("Bu kovanın kroki konumu yok!"); return; }
 
@@ -3020,59 +3018,42 @@ window.kovanTasi = async function(rowDelta, colDelta) {
   if (yeniRow < 0 || yeniRow >= ROWS) { showToast("Sıra sınırı aşıldı!"); return; }
   if (yeniCol < 0 || yeniCol >= COLS) { showToast("Kolon sınırı aşıldı!"); return; }
 
-  // Mevcut satırdaki diğer kovanlar (seçili hariç, orijinal pozisyonlarıyla)
-  const digerKovanlar = hives.filter(h =>
-    h.id !== krokiSeciliHiveId && h.pos && h.pos.row === yeniRow
+  // Hedef dolu mu?
+  const doluMu = (r, c) => hives.some(h =>
+    h.id !== krokiSeciliHiveId &&
+    h.pos && h.pos.row === r && h.pos.col === c
   );
-  const hedef = digerKovanlar.find(h => h.pos.col === yeniCol);
 
-  if (hedef) {
-    // Dolu hücre — seçili kovanın hareket yönünde ilk boşluğu bul
-    // 15 sağa gidecekse (colDelta=-1 görsel sağ), 16,17,18 de sola/sağa kayar
-    // Görsel yön: colDelta > 0 = sol, colDelta < 0 = sağ
-    // Kovanları hangi yöne itmemiz lazım?
-    // 15 sağa (colDelta=-1): 16 15'in eski yerine, 17 16'nın yerine...
-    // Yani 16,17,18 SOLA kayar (col azalır, colDelta=+1 yönünde)
-    // 15 sola (colDelta=+1): 14,13,12 SAĞA kayar (col artar, colDelta=-1 yönünde)
-    const itmeYonu = -colDelta; // seçili kovan sağa gidince diğerleri sola iter
+  if (!doluMu(yeniRow, yeniCol)) {
+    // Boş — direkt git
+    pendingPos[krokiSeciliHiveId] = {row: yeniRow, col: yeniCol};
+  } else {
+    // Dolu — tüm krokide spiral tarama ile ilk boşu bul
+    // Önce aynı satırda ara, sonra diğer satırlarda
+    let hedefPoz = null;
 
-    // itme yönünde ilk boşluğu bul (yeniCol'dan itibaren)
-    let boslukCol = -1;
-    for (let c = yeniCol + itmeYonu; c >= 0 && c < COLS; c += itmeYonu) {
-      if (!digerKovanlar.find(h => h.pos.col === c)) { boslukCol = c; break; }
+    // Tüm pozisyonları mesafeye göre sıralı tara
+    const adaylar = [];
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        if (!doluMu(r, c)) {
+          const mesafe = Math.abs(r - yeniRow) + Math.abs(c - yeniCol);
+          adaylar.push({r, c, mesafe});
+        }
+      }
     }
+    adaylar.sort((a, b) => a.mesafe - b.mesafe);
+    if (adaylar.length > 0) hedefPoz = {row: adaylar[0].r, col: adaylar[0].c};
 
-    if (boslukCol === -1) { showToast("Bu satırda yer açılamıyor!"); return; }
-
-    // Kaydırılacak kovanlar: yeniCol ile boslukCol arasındakiler
-    const aralik = itmeYonu > 0
-      ? digerKovanlar.filter(h => h.pos.col >= yeniCol && h.pos.col < boslukCol)
-      : digerKovanlar.filter(h => h.pos.col <= yeniCol && h.pos.col > boslukCol);
-
-    const kacKovan = aralik.length;
-    const yon_label = itmeYonu > 0 ? "sağa" : "sola";
-    if (!confirm(`Bu konumda kovan var!\n\n${kacKovan} kovan ${yon_label} kaydırılacak.\nDevam edilsin mi?`)) return;
-
-    // En uzaktakinden başla (çakışma olmasın)
-    const siralı = [...aralik].sort((a,b) =>
-      itmeYonu > 0 ? b.pos.col - a.pos.col : a.pos.col - b.pos.col
-    );
-
-    const batch = siralı.map(h =>
-      updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${h.id}`), {
-        pos: { row: yeniRow, col: h.pos.col + itmeYonu }
-      })
-    );
-    await Promise.all(batch);
-    // Firestore onSnapshot ile güncellenir, hemen devam et
+    if (!hedefPoz) { showToast("Krokide boş yer kalmadı!"); return; }
+    pendingPos[krokiSeciliHiveId] = hedefPoz;
   }
 
-  // Seçili kovanı yeni konuma taşı
-  pendingPos[krokiSeciliHiveId] = {row: yeniRow, col: yeniCol};
+  const poz = pendingPos[krokiSeciliHiveId];
 
   // Bilgi güncelle
   const bilgi = $("kroki-secili-bilgi");
-  if (bilgi) bilgi.textContent = `${hive.name}. Kovan → Sıra ${yeniRow+1}, Sağdan ${COLS-yeniCol}`;
+  if (bilgi) bilgi.textContent = `${hive.name}. Kovan → Sıra ${poz.row+1}, Sağdan ${COLS-poz.col}`;
 
   renderKroki();
 
@@ -3080,9 +3061,9 @@ window.kovanTasi = async function(rowDelta, colDelta) {
   setTimeout(() => {
     const grid = $("kroki-grid");
     if (!grid) return;
-    const gorselKolon = COLS - 1 - yeniCol;
+    const gorselKolon = COLS - 1 - poz.col;
     const hucreGenislik = 28;
-    const sol = gorselKolon * hucreGenislik + 22; // 22 = satır numarası genişliği
+    const sol = gorselKolon * hucreGenislik + 22;
     const genisBant = grid.clientWidth;
     const mevcutScroll = grid.scrollLeft;
     if (sol < mevcutScroll + 30 || sol + hucreGenislik > mevcutScroll + genisBant - 30) {
