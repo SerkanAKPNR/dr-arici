@@ -2451,16 +2451,21 @@ let selectedPos = null; // {row, col}
 
 function posKey(r, c) { return `${r}-${c}`; }
 function hiveAtPos(r, c) {
-  // Seçili kovan pending konumdaysa oraya çiz, eski yerini boş göster
   if (krokiSeciliHiveId && pendingPos[krokiSeciliHiveId]) {
     const p = pendingPos[krokiSeciliHiveId];
     const h = hives.find(x => x.id === krokiSeciliHiveId);
-    // Eski konumunu boş göster
-    if (h && h.pos && h.pos.row === r && h.pos.col === c) return null;
-    // Yeni konumuna çiz
-    if (p.row === r && p.col === c) return h;
+    if (h && h.pos && h.pos.row === r && h.pos.col === c) return null; // eski yer boş
+    if (p.row === r && p.col === c) return h; // yeni yerde göster
   }
   return hives.find(h => h.pos && h.pos.row === r && h.pos.col === c);
+}
+
+// Taşınan kovanın altındaki kovanı döndür
+function hiveAtPosAlt(r, c) {
+  return hives.find(h =>
+    h.id !== krokiSeciliHiveId &&
+    h.pos && h.pos.row === r && h.pos.col === c
+  );
 }
 
 function updatePosLabel() {
@@ -2503,6 +2508,28 @@ function renderMiniGrid() {
   el.innerHTML = html;
 }
 
+
+
+function krokiHucreHTMLAlt(hive) {
+  const color = hive.color || '#F59E0B';
+  return '<div style="position:absolute;width:24px;height:36px;border-radius:4px;' +
+    'background:' + color + ';opacity:0.4;top:0;left:0;border:2px solid ' + color + '"></div>';
+}
+
+function krokiHucreHTMLUst(hive) {
+  const floors = parseInt(hive.floors) || 1;
+  const color = hive.color || '#F59E0B';
+  let inner = '';
+  if (floors === 2) inner = '<div style="position:absolute;top:12px;left:0;right:0;height:2px;background:rgba(255,255,255,0.7)"></div>';
+  if (floors >= 3) inner = '<div style="position:absolute;top:12px;left:0;right:0;height:2px;background:rgba(255,255,255,0.7)"></div><div style="position:absolute;top:24px;left:0;right:0;height:2px;background:rgba(255,255,255,0.7)"></div>';
+  return '<div style="position:relative;width:24px;height:36px;border-radius:4px;overflow:hidden;' +
+    'background:' + color + ';border:3px solid var(--brown);' +
+    'box-shadow:0 0 0 1px var(--brown),0 4px 12px rgba(0,0,0,.4);' +
+    'display:flex;align-items:flex-end;justify-content:center;' +
+    'font-size:10px;color:#fff;font-weight:800;padding-bottom:2px;z-index:10;cursor:pointer"' +
+    ' onclick="selectHiveFromKroki('' + hive.id + '')">' +
+    inner + hive.name + '</div>';
+}
 
 function krokiHucreHTML(hive, isSecili) {
   const floors = parseInt(hive.floors) || 1;
@@ -3024,31 +3051,8 @@ window.kovanTasi = async function(rowDelta, colDelta) {
     h.pos && h.pos.row === r && h.pos.col === c
   );
 
-  if (!doluMu(yeniRow, yeniCol)) {
-    // Boş — direkt git
-    pendingPos[krokiSeciliHiveId] = {row: yeniRow, col: yeniCol};
-  } else {
-    // Dolu — tüm krokide spiral tarama ile ilk boşu bul
-    // Önce aynı satırda ara, sonra diğer satırlarda
-    let hedefPoz = null;
-
-    // Tüm pozisyonları mesafeye göre sıralı tara
-    const adaylar = [];
-    for (let r = 0; r < ROWS; r++) {
-      for (let c = 0; c < COLS; c++) {
-        if (!doluMu(r, c)) {
-          const mesafe = Math.abs(r - yeniRow) + Math.abs(c - yeniCol);
-          adaylar.push({r, c, mesafe});
-        }
-      }
-    }
-    adaylar.sort((a, b) => a.mesafe - b.mesafe);
-    if (adaylar.length > 0) hedefPoz = {row: adaylar[0].r, col: adaylar[0].c};
-
-    if (!hedefPoz) { showToast("Krokide boş yer kalmadı!"); return; }
-    pendingPos[krokiSeciliHiveId] = hedefPoz;
-  }
-
+  // Dolu olsa bile oraya git — üst üste görünür
+  pendingPos[krokiSeciliHiveId] = {row: yeniRow, col: yeniCol};
   const poz = pendingPos[krokiSeciliHiveId];
 
   // Bilgi güncelle
@@ -3076,13 +3080,25 @@ async function kovanTasiKaydet() {
   const yeniPoz = pendingPos[krokiSeciliHiveId];
   if (!yeniPoz) { krokiSecimKaldir(); return; }
 
-  // Son kontrol: hedef hala boş mu?
+  // Hedef dolu mu?
   const hedef = hives.find(h =>
     h.id !== krokiSeciliHiveId &&
     h.pos && h.pos.row === yeniPoz.row && h.pos.col === yeniPoz.col
   );
+
   if (hedef) {
-    showToast("⚠️ Hedef konum dolu, taşıma yapılamaz!");
+    const geriGonder = confirm(
+      "⚠️ Bu konum dolu! (" + hedef.name + ". Kovan)\n\nKovanı eski yerine geri gönderilsin mi?"
+    );
+    if (geriGonder) {
+      showToast("Kovan eski yerine döndü");
+      pendingPos = {};
+      originalPos = {};
+      krokiSeciliHiveId = null;
+      const panel = $("kroki-ok-panel");
+      if (panel) panel.style.display = "none";
+      renderKroki();
+    }
     return;
   }
 
