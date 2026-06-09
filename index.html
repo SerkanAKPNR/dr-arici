@@ -127,7 +127,7 @@
 
   /* FAB */
   .fab {
-    position: fixed; bottom: max(80px, calc(60px + env(safe-area-inset-bottom))); right: 20px;
+    position: fixed; bottom: max(100px, calc(80px + env(safe-area-inset-bottom))); right: 20px;
     width: 56px; height: 56px;
     background: var(--amber); color: var(--white); border: none; border-radius: 50%;
     font-size: 28px; cursor: pointer; box-shadow: 0 6px 20px rgba(217,119,6,.4);
@@ -250,7 +250,7 @@
       <input id="hive-search" class="input" placeholder="🔍 Numara, ırk, tip ara..."
         oninput="renderHives()" style="margin-bottom:0">
     </div>
-    <div id="hives-list"><div class="loading">⏳</div></div>
+    <div id="hives-list" style="padding-bottom:70px"><div class="loading">⏳</div></div>
   </div>
 
   <div class="content" id="tab-schedule" style="display:none">
@@ -2681,13 +2681,15 @@ function krokiAyrintilariGoster(id, krokiMod) {
     ${schedHtml}
     ${hive.notes?`<div style="margin-top:12px;font-size:13px;color:var(--gray);border-top:1px dashed var(--gray2);padding-top:10px">${hive.notes}</div>`:''}
 
-    <div style="display:flex;gap:8px;margin-top:14px">
+    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
       <button onclick="closeModal('modal-kovan-detay');editHive('${hive.id}')"
-        style="flex:1;padding:10px;border:1px solid var(--gray2);border-radius:10px;background:var(--white);cursor:pointer;font-size:13px;font-family:inherit">✏️ Düzenle</button>
+        style="flex:1;padding:10px;border:1px solid var(--gray2);border-radius:10px;background:var(--white);cursor:pointer;font-size:13px;font-family:inherit;min-width:80px">✏️ Düzenle</button>
+      <button onclick="closeModal('modal-kovan-detay');notEkleAc('${hive.id}')"
+        style="flex:1;padding:10px;border:1px solid var(--amber);border-radius:10px;background:var(--white);color:var(--amber);cursor:pointer;font-size:13px;font-weight:700;font-family:inherit;min-width:80px">📝 Not</button>
       ${krokiMod ? `<button onclick="closeModal('modal-kovan-detay');krokiTasiModuBaslat('${hive.id}')"
-        style="flex:1;padding:10px;border:none;border-radius:10px;background:var(--amber);color:#fff;cursor:pointer;font-size:13px;font-weight:700;font-family:inherit">↔️ Taşı</button>` :
+        style="flex:1;padding:10px;border:none;border-radius:10px;background:var(--amber);color:#fff;cursor:pointer;font-size:13px;font-weight:700;font-family:inherit;min-width:80px">↔️ Taşı</button>` :
       `<button onclick="closeModal('modal-kovan-detay');selectedHiveId='${hive.id}';activeTab='schedule';applyTabOrder(getTabOrder())"
-        style="flex:1;padding:10px;border:none;border-radius:10px;background:var(--amber);color:#fff;cursor:pointer;font-size:13px;font-weight:700;font-family:inherit">📋 Takvim</button>`}
+        style="flex:1;padding:10px;border:none;border-radius:10px;background:var(--amber);color:#fff;cursor:pointer;font-size:13px;font-weight:700;font-family:inherit;min-width:80px">📋 Takvim</button>`}
     </div>
   `;
   openModal('modal-kovan-detay');
@@ -2958,8 +2960,8 @@ window.notlarModalAc = function(hiveId) {
       ${notlar.map((n, i) => `
         <div style="background:var(--cream2);border-radius:10px;padding:10px 12px">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <button onclick="hiveNotSil('${hiveId}',${notlar.length-1-i});closeModal('modal-kovan-detay')" style="background:none;border:none;color:var(--gray);cursor:pointer;font-size:13px;padding:0 4px">🗑️</button>
             <span style="font-size:11px;color:var(--amber);font-weight:600">${n.tarih}</span>
-            <button onclick="hiveNotSil('${hiveId}',${notlar.length-1-i});closeModal('modal-kovan-detay')" style="background:none;border:none;color:var(--gray);cursor:pointer;font-size:13px">🗑️</button>
           </div>
           <div style="font-size:14px;color:var(--brown2)">${n.metin}</div>
         </div>`).join("")}
