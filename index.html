@@ -756,16 +756,16 @@ function getNextHiveNumber() {
 }
 
 const HIVE_COLORS = [
-  // Sarı/Turuncu/Amber
+  // Sarı/Turuncu/Amber 💛
   "#FCD34D","#F59E0B","#D97706","#B45309",
   // Kahve/Toprak
   "#92400E","#78350F","#57534E","#44403C",
   // Yeşil
   "#4ADE80","#16A34A","#166534","#14532D",
-  // Mavi
-  "#60A5FA","#2563EB","#1D4ED8","#1E3A5F",
-  // Kırmızı/Pembe
-  "#F87171","#DC2626","#9F1239","#831843",
+  // Mavi 💙
+  "#93C5FD","#60A5FA","#2563EB","#1E3A5F",
+  // Lacivert/İndigo
+  "#818CF8","#4F46E5","#3730A3","#1E1B4B",
   // Mor
   "#C084FC","#9333EA","#7E22CE","#581C87",
   // Cyan/Teal
@@ -807,7 +807,7 @@ $("btn-register").onclick = async () => {
   } catch(err) { showAuthError(err.code); }
 };
 $("btn-logout").onclick = () => {
-  [_unsubAyarlar,_unsubHives,_unsubSchedules,_unsubRecords,_unsubGecmis].forEach(u=>u&&u());
+  [_unsubAyarlar,_unsubGelir,_unsubHives,_unsubSchedules,_unsubRecords,_unsubGecmis].forEach(u=>u&&u());
   signOut(auth);
 };
 
@@ -1785,6 +1785,9 @@ function getGelirGider() {
 
 function saveGelirGider(list) {
   localStorage.setItem("gelir_gider", JSON.stringify(list));
+  // Firestore'a kaydet
+  const gelirDoc = doc(db, `users/${activeIsletmeId||currentUser.uid}/ayarlar/gelir_gider`);
+  setDoc(gelirDoc, { kayitlar: list }, { merge: false }).catch(e => console.error("Gelir kayıt hatası:", e));
 }
 
 function renderGelir() {
@@ -3114,7 +3117,7 @@ window.kovanTasiKaydet = kovanTasiKaydet;
 
 window.kovanTasi = kovanTasi;
 window.cikisYap = function() {
-  [_unsubAyarlar,_unsubHives,_unsubSchedules,_unsubRecords,_unsubGecmis].forEach(u=>u&&u());
+  [_unsubAyarlar,_unsubGelir,_unsubHives,_unsubSchedules,_unsubRecords,_unsubGecmis].forEach(u=>u&&u());
   signOut(auth);
 };
 
