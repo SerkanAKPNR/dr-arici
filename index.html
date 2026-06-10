@@ -682,22 +682,23 @@
 
 <!-- MODAL: Kovan Detay -->
 <div class="modal-overlay" id="modal-kovan-detay-tam">
-  <div class="modal" style="display:flex;flex-direction:column;height:88vh;max-height:88vh">
+  <div class="modal" style="display:flex;flex-direction:column;height:88vh;max-height:88vh;padding-bottom:0">
     <div class="modal-handle" style="flex-shrink:0"></div>
-    <!-- Navigasyon başlık — sabit -->
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-shrink:0">
-      <button onclick="kovanDetayNavigate(-1)"
-        style="background:var(--amber);color:#fff;border:none;border-radius:10px;width:40px;height:40px;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">▲</button>
-      <div style="flex:1;text-align:center">
-        <div id="detay-nav-pos" style="font-size:12px;color:var(--gray);font-family:monospace;font-weight:600"></div>
-      </div>
-      <button onclick="kovanDetayNavigate(1)"
-        style="background:var(--amber);color:#fff;border:none;border-radius:10px;width:40px;height:40px;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">▼</button>
+    <!-- Başlık — kapat butonu -->
+    <div style="display:flex;justify-content:flex-end;margin-bottom:8px;flex-shrink:0">
       <button onclick="closeModal('modal-kovan-detay-tam')"
-        style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--gray);margin-left:4px">✕</button>
+        style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--gray)">✕</button>
     </div>
     <!-- İçerik — scroll -->
     <div id="kovan-detay-tam-icerik" style="flex:1;overflow-y:auto;padding-bottom:8px"></div>
+    <!-- Navigasyon — altta sabit -->
+    <div style="flex-shrink:0;display:flex;align-items:center;gap:12px;padding:12px 20px;border-top:1px solid var(--gray2);background:var(--white)">
+      <button onclick="kovanDetayNavigate(-1)"
+        style="flex:1;background:var(--amber);color:#fff;border:none;border-radius:12px;height:48px;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center">▲</button>
+      <div id="detay-nav-pos" style="font-size:13px;color:var(--gray);font-family:monospace;font-weight:600;text-align:center;min-width:50px"></div>
+      <button onclick="kovanDetayNavigate(1)"
+        style="flex:1;background:var(--amber);color:#fff;border:none;border-radius:12px;height:48px;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center">▼</button>
+    </div>
   </div>
 </div>
 
