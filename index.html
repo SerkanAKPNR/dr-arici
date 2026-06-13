@@ -679,17 +679,7 @@
     <div class="field">
       <textarea class="input" id="hive-not-text" placeholder="Gözlem, kontrol notu..." style="height:80px;resize:none"></textarea>
     </div>
-    <!-- Ses kaydı -->
-    <div style="margin-bottom:14px">
-      <button id="ses-btn" onclick="sesKaydiBaskisi()"
-        style="width:100%;padding:12px;border:1.5px solid var(--amber);border-radius:10px;
-        background:var(--white);color:var(--amber);font-size:15px;font-weight:700;
-        cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">
-        🎤 Sesle Ekle
-      </button>
-      <div id="ses-durum" style="font-size:12px;color:var(--gray);text-align:center;margin-top:6px;min-height:16px"></div>
-    </div>
-    <div class="btn-row">
+<div class="btn-row">
       <button class="btn btn-outline" onclick="closeModal('modal-hive-not')">İptal</button>
       <button class="btn btn-primary" onclick="hiveNotKaydet()">Kaydet</button>
     </div>
@@ -3697,71 +3687,6 @@ window.kalipSec = function(id) {
 window.hiveNotKaydet = hiveNotKaydet;
 window.hiveNotSil = hiveNotSil;
 
-// ─── SES KAYDI ───────────────────────────────────────────────────
-let sesKaydi = null;
-let sesAktif = false;
-
-function sesKaydiBaskisi() {
-  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-    showToast("⚠️ Tarayıcınız ses tanımayı desteklemiyor. Chrome deneyin.");
-    return;
-  }
-  if (sesAktif) {
-    sesKaydi.stop();
-    return;
-  }
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  sesKaydi = new SR();
-  sesKaydi.lang = "tr-TR";
-  sesKaydi.continuous = false;
-  sesKaydi.interimResults = true;
-
-  const btn = $("ses-btn");
-  const durum = $("ses-durum");
-
-  sesKaydi.onstart = () => {
-    sesAktif = true;
-    btn.innerHTML = "⏹️ Durdurmak için tıkla";
-    btn.style.background = "#FEE2E2";
-    btn.style.borderColor = "var(--red)";
-    btn.style.color = "var(--red)";
-    durum.textContent = "🎙️ Dinleniyor...";
-  };
-
-  sesKaydi.onresult = (e) => {
-    let metin = "";
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      metin += e.results[i][0].transcript;
-    }
-    // Mevcut metne ekle
-    const mevcut = $("hive-not-text").value;
-    $("hive-not-text").value = (mevcut ? mevcut + " " : "") + metin;
-    durum.textContent = "✓ Metin alındı";
-  };
-
-  sesKaydi.onerror = (e) => {
-    durum.textContent = "⚠️ Hata: " + (e.error === "not-allowed" ? "Mikrofon izni verilmedi" : e.error);
-    sesKaydiBitir();
-  };
-
-  sesKaydi.onend = () => {
-    sesKaydiBitir();
-  };
-
-  sesKaydi.start();
-}
-
-function sesKaydiBitir() {
-  sesAktif = false;
-  const btn = $("ses-btn");
-  if (btn) {
-    btn.innerHTML = "🎤 Sesle Ekle";
-    btn.style.background = "var(--white)";
-    btn.style.borderColor = "var(--amber)";
-    btn.style.color = "var(--amber)";
-  }
-}
-window.sesKaydiBaskisi = sesKaydiBaskisi;
 
 window.renderHiveNotes = renderHiveNotes;
 window.renderGelir = renderGelir;
