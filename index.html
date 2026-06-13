@@ -246,9 +246,12 @@
   </div>
 
   <div class="content" id="tab-hives" style="display:none">
-    <div style="margin-bottom:10px">
+    <div style="margin-bottom:10px;display:flex;gap:8px">
       <input id="hive-search" class="input" placeholder="🔍 Numara, ırk, tip ara..."
-        oninput="renderHives()" style="margin-bottom:0">
+        oninput="renderHives()" style="margin-bottom:0;flex:1">
+      <select id="hive-kalip-filter" class="input" onchange="renderHives()" style="margin-bottom:0;max-width:150px">
+        <option value="">Tüm Kalıplar</option>
+      </select>
     </div>
     <div id="hives-list" style="padding-bottom:70px"><div class="loading">⏳</div></div>
   </div>
@@ -389,6 +392,18 @@
         <div style="font-size:12px;color:var(--gray);margin-bottom:12px">Sürükleyerek sırayı değiştir</div>
         <div id="tab-order-list" style="display:flex;flex-direction:column;gap:6px"></div>
         <button onclick="saveTabOrder()" style="width:100%;margin-top:12px;padding:10px;background:var(--amber);color:#fff;border:none;border-radius:10px;font-weight:700;cursor:pointer;font-size:14px;font-family:inherit">Kaydet</button>
+      </div>
+
+      <div class="sec-title">📌 Not Kalıpları</div>
+      <div style="background:var(--white);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);margin-bottom:10px">
+        <div style="font-size:12px;color:var(--gray);margin-bottom:10px">Not eklerken hızlı seçim için kalıplar. Süre eklerseniz uygulama açılınca hatırlatır.</div>
+        <div id="kalip-listesi" style="margin-bottom:12px"></div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <input id="yeni-kalip-ikon" class="input" placeholder="💪" style="width:50px;text-align:center;flex-shrink:0">
+          <input id="yeni-kalip-ad" class="input" placeholder="Destek Verilecek..." style="flex:1;min-width:100px">
+          <input id="yeni-kalip-sure" class="input" type="number" placeholder="gün" min="0" style="width:60px;flex-shrink:0" title="Hatırlatma süresi (gün)">
+          <button onclick="kalipEkle()" class="btn btn-primary" style="flex-shrink:0">+ Ekle</button>
+        </div>
       </div>
 
       <div class="sec-title">Kovan Tipleri</div>
@@ -659,8 +674,10 @@
   <div class="modal">
     <div class="modal-handle"></div>
     <div class="modal-title">📝 Not Ekle</div>
+    <!-- Kalıp seçici -->
+    <div id="kalip-secici" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px"></div>
     <div class="field">
-      <textarea class="input" id="hive-not-text" placeholder="Gözlem, kontrol notu..." style="height:100px;resize:none"></textarea>
+      <textarea class="input" id="hive-not-text" placeholder="Gözlem, kontrol notu..." style="height:80px;resize:none"></textarea>
     </div>
     <!-- Ses kaydı -->
     <div style="margin-bottom:14px">
@@ -1014,6 +1031,7 @@ function loadAyarlar() {
     }
     // Render
     if (document.getElementById("grup-listesi")) renderGrupListesi();
+  if (document.getElementById("kalip-listesi")) renderKalipListesi();
     if (document.getElementById("tip-listesi")) renderTipListesi();
     populateHiveTypeSelect();
   });
@@ -1024,6 +1042,7 @@ async function saveAyarlarToFirestore() {
   const ayarDoc = isletmeDoc("ayarlar/genel");
   await setDoc(ayarDoc, {
     gruplar: getGruplar(),
+    kaliplar: getKaliplar(),
     tipler: getTipler(),
     bannedNumbers: getBannedNumbers(),
     framesPerFloor: getFramesPerFloor(),
@@ -1105,6 +1124,13 @@ function updateStats() {
 
 // ─── RENDER HIVES ───────────────────────────────────────────────
 function renderHives() {
+  // Kalıp dropdown güncelle
+  const kalipFilterEl = $("hive-kalip-filter");
+  if (kalipFilterEl) {
+    const mevcut = kalipFilterEl.value;
+    kalipFilterEl.innerHTML = `<option value="">Tüm Kalıplar</option>` +
+      getKaliplar().map(k => `<option value="${k.id}" ${k.id===mevcut?'selected':''}>${k.ikon||''} ${k.ad}</option>`).join("");
+  }
   const el = $("hives-list");
   let filteredHives = [...hives].sort((a,b) => parseInt(a.name||0) - parseInt(b.name||0));
   if (activeGrupFilter) {
@@ -1118,6 +1144,12 @@ function renderHives() {
     (h.breed||"").toLowerCase().includes(q) ||
     (h.type||"").toLowerCase().includes(q)
   );
+  // Kalıp filtresi — son nota göre
+  const kalipFilter = $("hive-kalip-filter")?.value;
+  if (kalipFilter) filteredHives = filteredHives.filter(h => {
+    const notlar = h.notlar || [];
+    return notlar.some(n => n.kalip === kalipFilter);
+  });
 
   // Aktif filtre başlığı
   let filterHeader = "";
@@ -2058,8 +2090,10 @@ function renderKovanDetayTam() {
         style="flex:1;padding:10px;border:1.5px solid var(--amber);border-radius:10px;background:var(--white);color:var(--amber);cursor:pointer;font-size:13px;font-weight:700;font-family:inherit;min-width:80px">📝 Not</button>
       <button onclick="closeModal('modal-kovan-detay-tam');editHive('${hive.id}')"
         style="flex:1;padding:10px;border:1.5px solid var(--gray2);border-radius:10px;background:var(--white);cursor:pointer;font-size:13px;font-family:inherit;min-width:80px">✏️ Düzenle</button>
-      <button onclick="closeModal('modal-kovan-detay-tam');kovanIslemModal('${hive.id}')"
-        style="flex:1;padding:10px;border:1.5px solid #FEE2E2;border-radius:10px;background:#FFF5F5;cursor:pointer;font-size:13px;color:var(--red);font-family:inherit;min-width:80px">⬇️ İşlem</button>
+      ${activeTab==="kroki" ? `<button onclick="closeModal('modal-kovan-detay-tam');krokiTasiModuBaslat('${hive.id}')"
+        style="flex:1;padding:10px;border:1.5px solid var(--amber);border-radius:10px;background:var(--amber);color:#fff;cursor:pointer;font-size:13px;font-weight:700;font-family:inherit;min-width:80px">↔️ Taşı</button>` :
+      `<button onclick="closeModal('modal-kovan-detay-tam');kovanIslemModal('${hive.id}')"
+        style="flex:1;padding:10px;border:1.5px solid #FEE2E2;border-radius:10px;background:#FFF5F5;cursor:pointer;font-size:13px;color:var(--red);font-family:inherit;min-width:80px">⬇️ İşlem</button>`}
     </div>
   `;
 }
@@ -2085,7 +2119,9 @@ function renderHiveNotes(h) {
     </div>`;
   }
   const sonNot = notlar[0];
+  const sonKalip = sonNot.kalip ? getKaliplar().find(k => k.id === sonNot.kalip) : null;
   return `<div style="margin-top:8px;border-top:1px dashed var(--gray2);padding-top:8px">
+    ${sonKalip ? `<div style="display:inline-flex;align-items:center;gap:3px;background:var(--amber4);color:var(--amber);border-radius:20px;padding:2px 8px;font-size:11px;font-weight:600;margin-bottom:4px">${sonKalip.ikon} ${sonKalip.ad}${sonNot.bitisT ? ` · ${new Date(sonNot.bitisT).toLocaleDateString("tr-TR",{day:"numeric",month:"short"})}` : ''}</div>` : ''}
     <div style="display:flex;gap:8px;align-items:flex-start">
       <div style="flex:1;cursor:pointer" onclick="notlarModalAc('${h.id}')">
         <div style="font-size:11px;color:var(--amber);font-weight:600;margin-bottom:2px">${sonNot.tarih} ${notlar.length > 1 ? `<span style="color:var(--gray)">(+${notlar.length-1} not daha)</span>` : ''}</div>
@@ -2096,9 +2132,21 @@ function renderHiveNotes(h) {
   </div>`;
 }
 
+let seciliKalipId = null;
+
 function notEkleAc(hiveId) {
   notEklenenHiveId = hiveId;
   $("hive-not-text").value = "";
+  seciliKalipId = null;
+  // Kalıp butonlarını doldur
+  const el = $("kalip-secici");
+  if (el) {
+    el.innerHTML = getKaliplar().map(k =>
+      `<button onclick="kalipSec('${k.id}')" id="kalip-btn-${k.id}"
+        style="padding:5px 10px;border:1.5px solid var(--gray2);border-radius:20px;background:var(--white);
+        cursor:pointer;font-size:12px;font-family:inherit;color:var(--brown2)">${k.ikon} ${k.ad}</button>`
+    ).join("");
+  }
   openModal("modal-hive-not");
 }
 
@@ -2107,10 +2155,20 @@ async function hiveNotKaydet() {
   if (!metin) { showToast("Not boş olamaz"); return; }
   const hive = hives.find(h => h.id === notEklenenHiveId);
   if (!hive) return;
-  const notlar = hive.notlar || [];
+  const notlar = [...(hive.notlar || [])];
   const tarih = new Date().toLocaleDateString("tr-TR", { day:"numeric", month:"long", year:"numeric" });
-  notlar.push({ metin, tarih });
-  await updateDoc(doc(db, `users/${currentUser.uid}/kovanllar/${notEklenenHiveId}`), { notlar });
+  const yeniNot = { metin, tarih };
+  if (seciliKalipId) {
+    yeniNot.kalip = seciliKalipId;
+    const kalip = getKaliplar().find(k => k.id === seciliKalipId);
+    if (kalip && kalip.sure) {
+      const bitis = new Date();
+      bitis.setDate(bitis.getDate() + kalip.sure);
+      yeniNot.bitisT = bitis.toISOString().split("T")[0];
+    }
+  }
+  notlar.push(yeniNot);
+  await updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${notEklenenHiveId}`), { notlar });
   closeModal("modal-hive-not");
   showToast("Not eklendi ✓");
 }
@@ -2235,6 +2293,85 @@ Devam etmek istiyor musunuz?`)) return;
 };
 
 // ─── GRUP YÖNETİMİ ──────────────────────────────────────────────
+
+// ─── KALIP SİSTEMİ ───────────────────────────────────────────────
+const VARSAYILAN_KALIPLAR = [
+  { id: "destek", ad: "Destek Verilecek", ikon: "💪", sure: 7 },
+  { id: "besleme", ad: "Besleme Yapılacak", ikon: "🍬", sure: 7 },
+  { id: "kontrol", ad: "Ana Memesi Kontrolü", ikon: "🔍", sure: 14 },
+  { id: "seleksiyon", ad: "Seleksiyon", ikon: "✂️", sure: 0 },
+  { id: "ogul", ad: "Oğul Alındı", ikon: "🐝", sure: 0 },
+];
+
+function getKaliplar() {
+  try { return JSON.parse(localStorage.getItem("not_kaliplari") || "null") || VARSAYILAN_KALIPLAR; } catch(e) { return VARSAYILAN_KALIPLAR; }
+}
+
+function saveKaliplar(list) {
+  localStorage.setItem("not_kaliplari", JSON.stringify(list));
+  saveAyarlarToFirestore();
+}
+
+function kalipEkle() {
+  const ad = $("yeni-kalip-ad").value.trim();
+  const ikon = $("yeni-kalip-ikon").value.trim() || "📌";
+  const sure = parseInt($("yeni-kalip-sure").value) || 0;
+  if (!ad) { showToast("Kalıp adı gerekli"); return; }
+  const list = getKaliplar();
+  if (list.find(k => k.ad === ad)) { showToast("Bu isimde kalıp var"); return; }
+  list.push({ id: Date.now().toString(36), ad, ikon, sure });
+  saveKaliplar(list);
+  $("yeni-kalip-ad").value = "";
+  $("yeni-kalip-ikon").value = "";
+  $("yeni-kalip-sure").value = "";
+  renderKalipListesi();
+  showToast("Kalıp eklendi ✓");
+}
+window.kalipEkle = kalipEkle;
+
+function kalipSil(id) {
+  if (!confirm("Bu kalıbı sil?")) return;
+  saveKaliplar(getKaliplar().filter(k => k.id !== id));
+  renderKalipListesi();
+}
+window.kalipSil = kalipSil;
+
+function renderKalipListesi() {
+  const el = $("kalip-listesi");
+  if (!el) return;
+  el.innerHTML = getKaliplar().map(k =>
+    `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--gray2)">
+      <span style="font-size:16px">${k.ikon||''}</span>
+      <div style="flex:1">
+        <div style="font-size:14px;color:var(--brown);font-weight:600">${k.ad}</div>
+        ${k.sure ? `<div style="font-size:11px;color:var(--gray)">${k.sure} gün sonra hatırlatır</div>` : ''}
+      </div>
+      <button onclick="kalipSil('${k.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:15px">🗑️</button>
+    </div>`
+  ).join("");
+}
+window.renderKalipListesi = renderKalipListesi;
+
+// Kalıp hatırlatma kontrolü
+function kalipHatirlatmaKontrol() {
+  const bugun = new Date(); bugun.setHours(0,0,0,0);
+  const uyarilar = {};
+  hives.forEach(h => {
+    (h.notlar||[]).forEach(n => {
+      if (!n.kalip || !n.bitisT || n.tamamlandi) return;
+      const bitis = new Date(n.bitisT); bitis.setHours(0,0,0,0);
+      if (bitis <= bugun) {
+        const kalip = getKaliplar().find(k => k.id === n.kalip);
+        if (kalip) uyarilar[kalip.ad] = (uyarilar[kalip.ad] || 0) + 1;
+      }
+    });
+  });
+  const mesajlar = Object.entries(uyarilar).map(([ad, sayi]) => `${sayi} koloni: ${ad}`);
+  if (mesajlar.length) {
+    setTimeout(() => showToast("⚠️ " + mesajlar.join(" | "), 5000), 2000);
+  }
+}
+
 function getGruplar() {
   try { return JSON.parse(localStorage.getItem("arilık_gruplar") || "[]"); } catch(e) { return []; }
 }
@@ -2279,6 +2416,13 @@ function renderGrupListesi() {
       <button onclick="grupSil('${g.id}')"
         style="background:none;border:none;color:var(--red);cursor:pointer;font-size:16px">🗑️</button>
     </div>`).join("");
+}
+
+function populateStatusSelect(elId, selected) {
+  const sel = $(elId);
+  if (!sel) return;
+  sel.innerHTML = `<option value="">— Statü yok</option>` +
+    getStatusler().map(s => `<option value="${s.id}" ${s.id===selected?'selected':''}>${s.ikon} ${s.ad}</option>`).join("");
 }
 
 function populateHiveOriginSelect(elId, selected) {
@@ -2774,16 +2918,9 @@ let krokiSeciliHiveId = null;
 
 window.selectHiveFromKroki = function(id) {
   if (activeTab === "kroki") {
-    // Taşıma modundaysa seçimi değiştir
-    if (krokiSeciliHiveId) {
-      krokiSecimKaldir();
-      return;
-    }
-    // Kovan kartını popup olarak göster
-    krokiAyrintilariGoster(id, true);
-    return;
+    if (krokiSeciliHiveId) { krokiSecimKaldir(); return; }
   }
-  krokiAyrintilariGoster(id);
+  kovanDetayAc(id);
 };
 
 function krokiAyrintilariGoster(id, krokiMod) {
@@ -2971,6 +3108,7 @@ async function yedekAl() {
     kayitlar: records,
     kovan_gecmis: kovanGecmis,
     gruplar: getGruplar(),
+    kaliplar: getKaliplar(),
     tipler: getTipler(),
     bannedNumbers: getBannedNumbers(),
   };
@@ -3394,7 +3532,7 @@ function saveQueenBoyutu() {
 }
 window.saveQueenBoyutu = saveQueenBoyutu;
 window.queenHiveTikla = function(id) {
-  krokiAyrintilariGoster(id, false);
+  kovanDetayAc(id);
 };
 
 window.kovanKaydirModal = function(sira) {
@@ -3456,6 +3594,13 @@ function filterByType(tip) {
   activeGrupFilter = null;
   switchTab("hives");
   // Geçici tip filtresi — kovanlar listesini tipe göre filtrele
+  // Kalıp dropdown güncelle
+  const kalipFilterEl = $("hive-kalip-filter");
+  if (kalipFilterEl) {
+    const mevcut = kalipFilterEl.value;
+    kalipFilterEl.innerHTML = `<option value="">Tüm Kalıplar</option>` +
+      getKaliplar().map(k => `<option value="${k.id}" ${k.id===mevcut?'selected':''}>${k.ikon||''} ${k.ad}</option>`).join("");
+  }
   const el = $("hives-list");
   const filtered = hives.filter(h => h.type === tip);
   if (!filtered.length) return;
@@ -3532,6 +3677,23 @@ async function numarayiSerbest(name) {
 }
 window.numarayiSerbest = numarayiSerbest;
 window.notEkleAc = notEkleAc;
+
+window.kalipSec = function(id) {
+  seciliKalipId = id;
+  const kalip = getKaliplar().find(k => k.id === id);
+  if (!kalip) return;
+  // Metni doldur
+  $("hive-not-text").value = kalip.ad;
+  // Buton stilini güncelle
+  getKaliplar().forEach(k => {
+    const btn = $("kalip-btn-" + k.id);
+    if (btn) {
+      btn.style.background = k.id === id ? "var(--amber)" : "var(--white)";
+      btn.style.color = k.id === id ? "#fff" : "var(--brown2)";
+      btn.style.borderColor = k.id === id ? "var(--amber)" : "var(--gray2)";
+    }
+  });
+};
 window.hiveNotKaydet = hiveNotKaydet;
 window.hiveNotSil = hiveNotSil;
 
