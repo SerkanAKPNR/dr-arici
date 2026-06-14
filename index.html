@@ -264,9 +264,7 @@
         <div id="takvim-ay-baslik" style="color:#fff;font-weight:700;font-size:15px;font-family:'Playfair Display',serif"></div>
         <button onclick="takvimAyDegis(1)" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:0 6px">›</button>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(7,1fr);text-align:center;padding:6px 4px 2px">
-        ${['Pt','Sa','Ça','Pe','Cu','Ct','Pz'].map(g=>`<div style="font-size:10px;font-weight:700;color:var(--gray);padding:2px 0">${g}</div>`).join('')}
-      </div>
+      <div id="takvim-gun-basliklari" style="display:grid;grid-template-columns:repeat(7,1fr);text-align:center;padding:6px 4px 2px"></div>
       <div id="takvim-izgara" style="display:grid;grid-template-columns:repeat(7,1fr);padding:0 4px 8px;gap:2px"></div>
       <div id="takvim-gun-detay" style="display:none;padding:10px 14px;border-top:1px solid var(--gray2)"></div>
     </div>
@@ -1286,6 +1284,13 @@ function renderAylikTakvim() {
   const baslik = $("takvim-ay-baslik");
   const izgara = $("takvim-izgara");
   if (!baslik || !izgara) return;
+
+  // Gün başlıkları
+  const gunBasliklari = $("takvim-gun-basliklari");
+  if (gunBasliklari && !gunBasliklari.innerHTML) {
+    gunBasliklari.innerHTML = ['Pt','Sa','Ça','Pe','Cu','Ct','Pz']
+      .map(g=>`<div style="font-size:10px;font-weight:700;color:var(--gray);padding:2px 0;text-align:center">${g}</div>`).join('');
+  }
 
   const aylar = ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
   baslik.textContent = `${aylar[_takvimAy]} ${_takvimYil}`;
