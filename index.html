@@ -1903,6 +1903,7 @@ const TAB_DEFS = [
   { key: "schedule", label: "📋 Takvim" },
   { key: "records",  label: "📝 Kayıtlar" },
   { key: "gecmis",   label: "📜 Geçmiş" },
+  { key: "gelir",    label: "💰 Gelir/Gider" },
 ];
 
 function getTabOrder() {
@@ -4212,6 +4213,13 @@ window.cikisYap = function() {
   [_unsubAyarlar,_unsubGelir,_unsubHives,_unsubSchedules,_unsubRecords,_unsubGecmis,window._unsubHatir].forEach(u=>u&&u());
   signOut(auth);
 };
+// Ayarlar butonlarını direkt bağla
+setTimeout(() => {
+  const bc = $("btn-cikis-yap"); if (bc) bc.onclick = window.cikisYap;
+  const bv = $("btn-veri-sil"); if (bv) bv.onclick = window.verileriSilOnay;
+  const bh = $("btn-hesap-sil"); if (bh) bh.onclick = window.hesabiSilOnay;
+}, 0);
+
 window.verileriSilOnay = function() {
   $("sifre-modal-baslik").textContent = "🗑️ Verileri Sil";
   $("sifre-modal-aciklama").textContent = "Tüm kovan, kayıt ve takvim verileriniz silinecek. Bu işlem geri alınamaz. Devam etmek için şifrenizi girin.";
