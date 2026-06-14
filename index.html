@@ -621,9 +621,9 @@
       <div id="pos-selected" style="font-size:13px;color:var(--amber);margin-bottom:6px;min-height:18px"></div>
       <div id="mini-grid" style="overflow-x:auto;padding-bottom:4px"></div>
     </div>
-    <div id="queen-pos-bilgi" style="display:none;margin-bottom:10px;padding:10px 12px;background:#FFF9E6;border-radius:10px;border:1.5px solid var(--amber3)">
-      <div style="font-size:12px;font-weight:700;color:var(--amber)">👑 Kraliçe Kutusu Konumu</div>
-      <div id="queen-pos-label" style="font-size:13px;color:var(--brown);margin-top:2px"></div>
+    <div id="queen-pos-bolum" style="display:none;margin-bottom:10px">
+      <div style="font-size:13px;font-weight:700;color:var(--brown);margin-bottom:6px;padding-top:8px;border-top:1px dashed var(--gray2)">👑 Kraliçe Kutusu Konumu</div>
+      <div id="mini-queen-grid" style="overflow-x:auto;padding-bottom:4px"></div>
     </div>
     <div id="duzenle-notlar-bolumu" style="display:none;margin-bottom:10px">
       <div style="font-size:13px;font-weight:700;color:var(--brown);margin-bottom:8px;padding-top:8px;border-top:1px dashed var(--gray2)">📝 Notlar</div>
@@ -1252,6 +1252,9 @@ window.editHive = function(id) {
   selectedPos = h.pos || null;
   updatePosLabel();
   renderMiniGrid();
+  window._queenPos = h.qpos || null;
+  const qb3 = $("queen-pos-bolum");
+  if (qb3) { qb3.style.display = ""; renderMiniQueenGrid(); }
   $("hive-floors").value = h.floors||1;
   renderKatCitaFields(h.frames);
   renderColorPicker(h.color||HIVE_COLORS[0]);
@@ -1733,7 +1736,7 @@ $("fab-btn").onclick = () => {
     $("hive-strength").value = 5; $("hive-strength-val").textContent = 5;
     selectedPos = null;
     window._queenPos = null;
-    const qb2 = $("queen-pos-bilgi"); if (qb2) qb2.style.display = "none";
+    const qb2 = $("queen-pos-bolum"); if (qb2) qb2.style.display = "none";
     updatePosLabel();
     renderMiniGrid();
     renderColorPicker(HIVE_COLORS[0]);
@@ -3236,7 +3239,44 @@ function renderMiniGrid() {
 
 
 
-function krokiHucreHTMLAlt(hive) {
+function renderMiniQueenGrid() {
+  const el = $("mini-queen-grid");
+  if (!el) return;
+  const seciliPos = window._queenPos;
+  let html = `<div style="display:flex;flex-direction:column;gap:3px;min-width:${QCOLS*22+18}px">`;
+  html += `<div style="display:flex;gap:3px;padding-left:18px">`;
+  for (let c = QCOLS-1; c >= 0; c--) {
+    html += `<div style="width:20px;text-align:center;font-size:8px;color:var(--gray);flex-shrink:0">${QCOLS-c}</div>`;
+  }
+  html += `</div>`;
+  for (let r = 0; r < QROWS; r++) {
+    html += `<div style="display:flex;gap:3px;align-items:center">`;
+    html += `<span style="font-size:10px;color:var(--gray);width:14px;flex-shrink:0">${r+1}</span>`;
+    for (let c = QCOLS-1; c >= 0; c--) {
+      const hive = qhiveAtPos(r, c);
+      const isSel = seciliPos && seciliPos.row === r && seciliPos.col === c;
+      const isOccupied = hive && !(editingHiveId && hive.id === editingHiveId);
+      let bg = '#FFF9E6', border = '#FDE68A', cursor = 'pointer';
+      if (isOccupied) { bg = hive.color || '#F59E0B'; border = hive.color || '#F59E0B'; cursor = 'not-allowed'; }
+      else if (isSel) { bg = '#FCD34D'; border = '#D97706'; }
+      html += `<div onclick="selectQueenPos(${r},${c})"
+        title="${isOccupied ? hive.name+'. Kovan' : `Sıra ${r+1}, Sağdan ${QCOLS-c}`}"
+        style="width:20px;height:20px;border-radius:3px;background:${bg};border:1.5px solid ${border};cursor:${cursor};flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;font-weight:700">
+        ${isOccupied ? hive.name : ''}</div>`;
+    }
+    html += `</div>`;
+  }
+  html += `</div>`;
+  el.innerHTML = html;
+}
+
+window.selectQueenPos = function(r, c) {
+  const hive = qhiveAtPos(r, c);
+  const isOccupied = hive && !(editingHiveId && hive.id === editingHiveId);
+  if (isOccupied) return;
+  window._queenPos = {row: r, col: c};
+  renderMiniQueenGrid();
+};
   const color = hive.color || '#F59E0B';
   return '<div style="position:absolute;width:24px;height:36px;border-radius:4px;' +
     'background:' + color + ';opacity:0.4;top:0;left:0;border:2px solid ' + color + '"></div>';
@@ -3958,13 +3998,8 @@ window.queendenKovanEkle = function(row, col) {
   updatePosLabel();
   renderMiniGrid();
   renderColorPicker(HIVE_COLORS[0]);
-  // Kraliçe kutusu bilgisini göster
-  const qBilgi = $("queen-pos-bilgi");
-  const qLabel = $("queen-pos-label");
-  if (qBilgi && qLabel) {
-    qLabel.textContent = `Sıra ${row+1}, Sağdan ${QCOLS-col}. hücre`;
-    qBilgi.style.display = "";
-  }
+  const qb = $("queen-pos-bolum"); if (qb) qb.style.display = "";
+  renderMiniQueenGrid();
   openModal("modal-hive");
   setTimeout(() => renderKatCitaFields(), 50);
 };
