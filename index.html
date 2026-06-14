@@ -1696,6 +1696,7 @@ document.querySelectorAll(".tab").forEach(btn => {
     $("tab-kroki").style.display    = activeTab === "kroki"    ? "" : "none";
     $("tab-settings").style.display = activeTab === "settings" ? "" : "none";
     if (activeTab === "kroki") { renderKroki(); renderQueenKroki(); }
+    if (activeTab === "schedule") { renderSchedule(); }
     if (activeTab === "settings") renderSettings();
   };
 });
@@ -1805,6 +1806,7 @@ function applyTabOrder(order) {
       $("tab-kroki").style.display    = activeTab === "kroki"    ? "" : "none";
       $("tab-settings").style.display = activeTab === "settings" ? "" : "none";
       if (activeTab === "kroki") { renderKroki(); renderQueenKroki(); }
+      if (activeTab === "schedule") { renderSchedule(); }
       if (activeTab === "settings") renderSettings();
       if (activeTab === "home") renderHome();
       updateFabVisibility();
@@ -1939,7 +1941,7 @@ function saveKrokiBoyutu() {
   localStorage.setItem("kroki_cols", cols);
   saveAyarlarToFirestore();
   showToast(`✓ Kroki: ${rows} satır × ${cols} sütun`);
-  renderKroki();
+  renderKroki(); renderQueenKroki();
   renderMiniGrid();
 }
 window.saveKrokiBoyutu = saveKrokiBoyutu;
@@ -3471,7 +3473,7 @@ function switchTab(key) {
     if (el) el.style.display = activeTab === k ? "" : "none";
   });
   document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === key));
-  if (activeTab === "kroki") renderKroki();
+  if (activeTab === "kroki") { renderKroki(); renderQueenKroki(); }
   if (activeTab === "settings") renderSettings();
   if (activeTab === "home") renderHome();
   if (activeTab === "gecmis") renderGecmis();
@@ -3775,7 +3777,7 @@ window.krokiTasiModuBaslat = function(id) {
     panel.style.display = "block";
     bilgi.textContent = `${hive.name}. Kovan seçili — ok tuşlarıyla taşı`;
   }
-  renderKroki();
+  renderKroki(); renderQueenKroki();
 };
 
 window.krokiSecimKaldir = function() {
@@ -3784,7 +3786,7 @@ window.krokiSecimKaldir = function() {
   originalPos = {};
   const panel = $("kroki-ok-panel");
   if (panel) panel.style.display = "none";
-  renderKroki();
+  renderKroki(); renderQueenKroki();
 };
 
 // pendingPos: sadece seçili kovanın yeni konumu {row, col}
@@ -3825,7 +3827,7 @@ window.kovanTasi = async function(rowDelta, colDelta) {
   const bilgi = $("kroki-secili-bilgi");
   if (bilgi) bilgi.textContent = `${hive.name}. Kovan → Sıra ${poz.row+1}, Sağdan ${COLS-poz.col}`;
 
-  renderKroki();
+  renderKroki(); renderQueenKroki();
 
   // Seçili kovanı görünür alana getir
   setTimeout(() => {
@@ -3863,7 +3865,7 @@ async function kovanTasiKaydet() {
       krokiSeciliHiveId = null;
       const panel = $("kroki-ok-panel");
       if (panel) panel.style.display = "none";
-      renderKroki();
+      renderKroki(); renderQueenKroki();
     }
     return;
   }
