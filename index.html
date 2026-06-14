@@ -257,6 +257,19 @@
   </div>
 
   <div class="content" id="tab-schedule" style="display:none">
+    <!-- Aylık Takvim -->
+    <div id="aylik-takvim" style="background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:12px;overflow:hidden">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:linear-gradient(135deg,var(--brown),var(--amber))">
+        <button onclick="takvimAyDegis(-1)" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:0 6px">‹</button>
+        <div id="takvim-ay-baslik" style="color:#fff;font-weight:700;font-size:15px;font-family:'Playfair Display',serif"></div>
+        <button onclick="takvimAyDegis(1)" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:0 6px">›</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);text-align:center;padding:6px 4px 2px">
+        ${['Pt','Sa','Ça','Pe','Cu','Ct','Pz'].map(g=>`<div style="font-size:10px;font-weight:700;color:var(--gray);padding:2px 0">${g}</div>`).join('')}
+      </div>
+      <div id="takvim-izgara" style="display:grid;grid-template-columns:repeat(7,1fr);padding:0 4px 8px;gap:2px"></div>
+      <div id="takvim-gun-detay" style="display:none;padding:10px 14px;border-top:1px solid var(--gray2)"></div>
+    </div>
     <div class="filter-bar" id="sched-filters">
       <button class="filter-btn active" data-f="all">Tümü</button>
       <button class="filter-btn" data-f="ilaçlama">💊 İlaçlama</button>
@@ -774,6 +787,9 @@ let records = [];
 let activeTab = "hives";
 let selectedHiveId = null;
 let schedFilter = "all";
+let _takvimYil = new Date().getFullYear();
+let _takvimAy = new Date().getMonth(); // 0-11
+let _takvimSeciliGun = null;
 let editingHiveId = null;
 
 // ─── KOVAN NUMARALAMA ────────────────────────────────────────────
@@ -1266,6 +1282,130 @@ window.deleteHive = async function(id, durum, not) {
 };
 
 // ─── RENDER SCHEDULE ────────────────────────────────────────────
+function renderAylikTakvim() {
+  const baslik = $("takvim-ay-baslik");
+  const izgara = $("takvim-izgara");
+  if (!baslik || !izgara) return;
+
+  const aylar = ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
+  baslik.textContent = `${aylar[_takvimAy]} ${_takvimYil}`;
+
+  const bugun = new Date();
+  const ilkGun = new Date(_takvimYil, _takvimAy, 1);
+  const sonGun = new Date(_takvimYil, _takvimAy + 1, 0).getDate();
+
+  // Pazartesi bazlı haftanın günü (0=Pt, 6=Pz)
+  let baslangicOffset = ilkGun.getDay() - 1;
+  if (baslangicOffset < 0) baslangicOffset = 6;
+
+  // schedules için tarih→tipler map
+  const schedMap = {};
+  const typeRenk = { ilaçlama:"#EF4444", besleme:"#22C55E", muayene:"#3B82F6", hasat:"#F59E0B" };
+  schedules.forEach(s => {
+    if (!s.date || s.done) return;
+    if (!schedMap[s.date]) schedMap[s.date] = new Set();
+    schedMap[s.date].add(s.type);
+  });
+
+  // notlar için bitisT map
+  const notMap = {};
+  hives.forEach(h => {
+    (h.notlar||[]).forEach(n => {
+      if (n.bitisT && !n.tamamlandi) {
+        if (!notMap[n.bitisT]) notMap[n.bitisT] = 0;
+        notMap[n.bitisT]++;
+      }
+    });
+  });
+
+  let html = "";
+  // Boş hücreler
+  for (let i = 0; i < baslangicOffset; i++) html += `<div></div>`;
+
+  for (let g = 1; g <= sonGun; g++) {
+    const tarihStr = `${_takvimYil}-${String(_takvimAy+1).padStart(2,'0')}-${String(g).padStart(2,'0')}`;
+    const bugunMu = bugun.getFullYear()===_takvimYil && bugun.getMonth()===_takvimAy && bugun.getDate()===g;
+    const seciliMi = _takvimSeciliGun === tarihStr;
+    const tipler = schedMap[tarihStr];
+    const notSayisi = notMap[tarihStr] || 0;
+
+    const noktalar = [
+      ...(tipler ? [...tipler].map(t => `<div style="width:5px;height:5px;border-radius:50%;background:${typeRenk[t]||'var(--amber)'}"></div>`) : []),
+      ...(notSayisi ? [`<div style="width:5px;height:5px;border-radius:50%;background:var(--amber)"></div>`] : [])
+    ].join('');
+
+    html += `<div onclick="takvimGunSec('${tarihStr}')" style="
+      text-align:center;padding:4px 2px;border-radius:8px;cursor:pointer;
+      background:${seciliMi?'var(--amber)':bugunMu?'var(--amber4)':'transparent'};
+      border:${bugunMu&&!seciliMi?'1.5px solid var(--amber)':'1.5px solid transparent'};
+      min-height:38px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:2px">
+      <div style="font-size:12px;font-weight:${bugunMu?'700':'400'};color:${seciliMi?'#fff':bugunMu?'var(--amber)':'var(--brown2)'};">${g}</div>
+      <div style="display:flex;gap:2px;flex-wrap:wrap;justify-content:center">${noktalar}</div>
+    </div>`;
+  }
+
+  izgara.innerHTML = html;
+  renderTakvimGunDetay();
+}
+
+function takvimGunDetayIcerik(tarihStr) {
+  const typeRenk = { ilaçlama:"#EF4444", besleme:"#22C55E", muayene:"#3B82F6", hasat:"#F59E0B" };
+  const iconMap = { ilaçlama:"💊", besleme:"🍬", muayene:"🔍", hasat:"🍯" };
+  const gunSchedler = schedules.filter(s => s.date === tarihStr && !s.done);
+  const gunNotlar = [];
+  hives.forEach(h => {
+    (h.notlar||[]).forEach(n => {
+      if (n.bitisT === tarihStr && !n.tamamlandi) gunNotlar.push({hive:h, not:n});
+    });
+  });
+
+  if (!gunSchedler.length && !gunNotlar.length) return '<div style="font-size:13px;color:var(--gray)">Bu gün için görev veya hatırlatma yok.</div>';
+
+  let html = '';
+  gunSchedler.forEach(s => {
+    const hive = hives.find(h => h.id === s.hiveId);
+    html += `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--gray2)">
+      <div style="width:8px;height:8px;border-radius:50%;background:${typeRenk[s.type]||'var(--amber)'}"></div>
+      <span style="font-size:12px;color:var(--gray)">${iconMap[s.type]||''} ${s.type}</span>
+      <span style="font-size:13px;color:var(--brown);flex:1;font-weight:600">${s.drug}</span>
+      <span style="font-size:12px;color:var(--gray)">${hive?.name||'?'}. Kovan</span>
+    </div>`;
+  });
+  gunNotlar.forEach(({hive, not}) => {
+    const kalip = not.kalip ? getKaliplar().find(k=>k.id===not.kalip) : null;
+    html += `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--gray2)">
+      <div style="width:8px;height:8px;border-radius:50%;background:var(--amber)"></div>
+      <span style="font-size:12px;color:var(--gray)">${kalip?kalip.ikon+' '+kalip.ad:'📝 Not'}</span>
+      <span style="font-size:13px;color:var(--brown);flex:1">${not.metin}</span>
+      <span style="font-size:12px;color:var(--gray)">${hive.name}. Kovan</span>
+    </div>`;
+  });
+  return html;
+}
+
+function renderTakvimGunDetay() {
+  const el = $("takvim-gun-detay");
+  if (!el) return;
+  if (!_takvimSeciliGun) { el.style.display = "none"; return; }
+  const d = new Date(_takvimSeciliGun + 'T00:00:00');
+  const label = d.toLocaleDateString('tr-TR', {day:'numeric', month:'long', year:'numeric'});
+  el.style.display = "";
+  el.innerHTML = `<div style="font-size:12px;font-weight:700;color:var(--amber);margin-bottom:6px">${label}</div>${takvimGunDetayIcerik(_takvimSeciliGun)}`;
+}
+
+window.takvimAyDegis = function(yon) {
+  _takvimAy += yon;
+  if (_takvimAy > 11) { _takvimAy = 0; _takvimYil++; }
+  if (_takvimAy < 0) { _takvimAy = 11; _takvimYil--; }
+  _takvimSeciliGun = null;
+  renderAylikTakvim();
+};
+
+window.takvimGunSec = function(tarih) {
+  _takvimSeciliGun = _takvimSeciliGun === tarih ? null : tarih;
+  renderAylikTakvim();
+};
+
 function renderSchedule() {
   const el = $("schedule-list");
   let list = schedules
@@ -1302,6 +1442,7 @@ function renderSchedule() {
       </div>
     </div>`;
   }).join("");
+  renderAylikTakvim();
 }
 
 window.toggleSched = async function(id) {
