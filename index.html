@@ -709,7 +709,24 @@
   </div>
 </div>
 
-
+<!-- Genel Hatırlatma Modalı -->
+<div class="modal-overlay" id="modal-hatirlatma" style="z-index:50">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="hatirlatma-modal-baslik">🔔 Hatırlatma Ekle</div>
+    <div class="field">
+      <textarea class="input" id="hatirlatma-metin" placeholder="Ne hatırlatılsın?" style="height:80px;resize:none"></textarea>
+    </div>
+    <div class="field">
+      <label>Hatırlatma Tarihi</label>
+      <input type="date" class="input" id="hatirlatma-tarih">
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-outline" onclick="closeModal('modal-hatirlatma')">İptal</button>
+      <button class="btn btn-primary" id="hatirlatma-kaydet-btn" onclick="hatirlatmaKaydet()">Kaydet</button>
+    </div>
+  </div>
+</div>
 <!-- MODAL: Kovan Detay -->
 <div class="modal-overlay" id="modal-kovan-detay-tam">
   <div class="modal" style="display:flex;flex-direction:column;height:88vh;max-height:88vh;padding-bottom:0">
@@ -796,6 +813,7 @@ function getFramesPerFloor() {
 let hives = [];
 let schedules = [];
 let records = [];
+let hatirlatmalar = [];
 let activeTab = "hives";
 let selectedHiveId = null;
 let schedFilter = "all";
@@ -1040,6 +1058,7 @@ function loadAll() {
   loadHives();
   loadSchedules();
   loadRecords();
+  loadHatirlatmalar();
   loadKovanGecmis();
 }
 
@@ -1104,6 +1123,15 @@ function loadRecords() {
   _unsubRecords = onSnapshot(query(col("kayitlar"), orderBy("date", "desc")), snap => {
     records = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderRecords();
+  });
+}
+function loadHatirlatmalar() {
+  if (window._unsubHatir) window._unsubHatir();
+  window._unsubHatir = onSnapshot(query(col("hatirlatmalar"), orderBy("bitisT", "asc")), snap => {
+    hatirlatmalar = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderHatirlatmalar();
+    renderAylikTakvim();
+    renderHome();
   });
 }
 
@@ -1329,7 +1357,7 @@ function renderAylikTakvim() {
     schedMap[s.date].add(s.type);
   });
 
-  // notlar için bitisT map
+  // notlar için bitisT map (yeşil)
   const notMap = {};
   hives.forEach(h => {
     (h.notlar||[]).forEach(n => {
@@ -1338,6 +1366,15 @@ function renderAylikTakvim() {
         notMap[n.bitisT]++;
       }
     });
+  });
+
+  // genel hatırlatmalar map (mavi)
+  const hatirMap = {};
+  hatirlatmalar.forEach(h => {
+    if (h.bitisT && !h.tamamlandi) {
+      if (!hatirMap[h.bitisT]) hatirMap[h.bitisT] = 0;
+      hatirMap[h.bitisT]++;
+    }
   });
 
   let html = "";
@@ -1350,10 +1387,12 @@ function renderAylikTakvim() {
     const seciliMi = _takvimSeciliGun === tarihStr;
     const tipler = schedMap[tarihStr];
     const notSayisi = notMap[tarihStr] || 0;
+    const hatirSayisi = hatirMap[tarihStr] || 0;
 
     const noktalar = [
       ...(tipler ? [...tipler].map(t => `<div style="width:5px;height:5px;border-radius:50%;background:${typeRenk[t]||'var(--amber)'}"></div>`) : []),
-      ...(notSayisi ? [`<div style="width:5px;height:5px;border-radius:50%;background:var(--amber)"></div>`] : [])
+      ...(notSayisi ? [`<div style="width:5px;height:5px;border-radius:50%;background:#22C55E"></div>`] : []),
+      ...(hatirSayisi ? [`<div style="width:5px;height:5px;border-radius:50%;background:#3B82F6"></div>`] : [])
     ].join('');
 
     html += `<div onclick="takvimGunSec('${tarihStr}')" style="
@@ -1380,8 +1419,9 @@ function takvimGunDetayIcerik(tarihStr) {
       if (n.bitisT === tarihStr && !n.tamamlandi) gunNotlar.push({hive:h, not:n, idx});
     });
   });
+  const gunHatir = hatirlatmalar.filter(h => h.bitisT === tarihStr && !h.tamamlandi);
 
-  if (!gunSchedler.length && !gunNotlar.length) return '<div style="font-size:13px;color:var(--gray)">Bu gün için görev veya hatırlatma yok.</div>';
+  if (!gunSchedler.length && !gunNotlar.length && !gunHatir.length) return '<div style="font-size:13px;color:var(--gray)">Bu gün için görev veya hatırlatma yok.</div>';
 
   let html = '';
   gunSchedler.forEach(s => {
@@ -1422,6 +1462,28 @@ function takvimGunDetayIcerik(tarihStr) {
       </div>
     </div>`;
   });
+
+  gunHatir.forEach(h => {
+    html += `
+    <div style="background:#EFF6FF;border-radius:10px;padding:10px 12px;margin-bottom:8px;border:1px solid #BFDBFE">
+      <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px">
+        <div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px;background:#3B82F6"></div>
+        <div style="flex:1">
+          <div style="font-size:11px;color:#3B82F6;font-weight:600;margin-bottom:2px">🔔 Genel Hatırlatma</div>
+          <div style="font-size:13px;color:var(--brown)">${h.metin}</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button onclick="hatirlatmaTamamla('${h.id}')"
+          style="flex:1;padding:5px;background:#22C55E;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit;font-weight:600">✅ Tamamlandı</button>
+        <button onclick="hatirlatmaErtele('${h.id}')"
+          style="flex:1;padding:5px;background:var(--amber);color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit;font-weight:600">⏰ Ertele</button>
+        <button onclick="hatirlatmaEkleAc('${h.id}')"
+          style="padding:5px 8px;background:none;border:1px solid var(--gray2);border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit">✏️</button>
+      </div>
+    </div>`;
+  });
+
   return html;
 }
 
@@ -3017,8 +3079,91 @@ function renderHome() {
     </div>`;
   }
 
+  // Yaklaşan & gecikmiş hatırlatmalar
+  const bugun = new Date(); bugun.setHours(0,0,0,0);
+  const aktifHatir = hatirlatmalar.filter(h => !h.tamamlandi);
+  if (aktifHatir.length) {
+    html += `<div style="background:var(--white);border-radius:var(--radius);padding:16px;margin-bottom:10px;box-shadow:var(--shadow)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <span style="font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:var(--brown)">🔔 Hatırlatmalar</span>
+        <button onclick="hatirlatmaEkleAc()" style="background:var(--amber);color:#fff;border:none;border-radius:8px;padding:4px 10px;font-size:12px;cursor:pointer;font-family:inherit;font-weight:700">+ Ekle</button>
+      </div>
+      ${aktifHatir.slice(0,5).map(h => {
+        const tarih = new Date(h.bitisT + 'T00:00:00');
+        const gecti = tarih < bugun;
+        const bugunMu = tarih.getTime() === bugun.getTime();
+        return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--gray2)">
+          <div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:${gecti?'var(--red)':bugunMu?'var(--amber)':'#3B82F6'}"></div>
+          <div style="flex:1">
+            <div style="font-size:13px;color:var(--brown)">${h.metin}</div>
+            <div style="font-size:11px;color:${gecti?'var(--red)':'var(--gray)'}">${gecti?'⚠️ Gecikmiş · ':bugunMu?'📅 Bugün · ':''}${tarih.toLocaleDateString('tr-TR',{day:'numeric',month:'short'})}</div>
+          </div>
+          <button onclick="hatirlatmaTamamla('${h.id}')" style="background:none;border:none;color:#22C55E;cursor:pointer;font-size:18px">✅</button>
+          <button onclick="hatirlatmaErtele('${h.id}')" style="background:none;border:none;color:var(--amber);cursor:pointer;font-size:16px">⏰</button>
+        </div>`;
+      }).join('')}
+      ${aktifHatir.length > 5 ? `<div style="font-size:12px;color:var(--gray);text-align:center;margin-top:6px">${aktifHatir.length-5} hatırlatma daha...</div>` : ''}
+    </div>`;
+  } else {
+    html += `<button onclick="hatirlatmaEkleAc()" style="width:100%;padding:12px;background:var(--white);color:var(--amber);border:1.5px dashed var(--amber);border-radius:var(--radius);font-size:14px;cursor:pointer;font-family:inherit;font-weight:600;margin-bottom:10px">🔔 Hatırlatma Ekle</button>`;
+  }
+
   el.innerHTML = html;
 }
+
+// ─── GENEL HATIRLATMALAR ─────────────────────────────────────────
+let _hatirlatmaDuzenleId = null;
+
+function renderHatirlatmalar() {
+  renderHome();
+  renderAylikTakvim();
+}
+
+window.hatirlatmaEkleAc = function(id) {
+  _hatirlatmaDuzenleId = id || null;
+  const h = id ? hatirlatmalar.find(x => x.id === id) : null;
+  $("hatirlatma-modal-baslik").textContent = h ? "✏️ Hatırlatma Düzenle" : "🔔 Hatırlatma Ekle";
+  $("hatirlatma-kaydet-btn").textContent = h ? "Güncelle" : "Kaydet";
+  $("hatirlatma-metin").value = h ? h.metin : "";
+  $("hatirlatma-tarih").value = h ? h.bitisT : new Date().toISOString().split("T")[0];
+  openModal("modal-hatirlatma");
+};
+
+window.hatirlatmaKaydet = async function() {
+  const metin = $("hatirlatma-metin").value.trim();
+  const bitisT = $("hatirlatma-tarih").value;
+  if (!metin || !bitisT) { showToast("Metin ve tarih zorunlu"); return; }
+  if (_hatirlatmaDuzenleId) {
+    await updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/hatirlatmalar/${_hatirlatmaDuzenleId}`), { metin, bitisT });
+    showToast("Güncellendi ✓");
+  } else {
+    await addDoc(col("hatirlatmalar"), { metin, bitisT, tamamlandi: false, olusturma: new Date().toISOString() });
+    showToast("Hatırlatma eklendi ✓");
+  }
+  closeModal("modal-hatirlatma");
+};
+
+window.hatirlatmaTamamla = async function(id) {
+  await updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/hatirlatmalar/${id}`), { tamamlandi: true });
+  showToast("✅ Tamamlandı!");
+};
+
+window.hatirlatmaErtele = async function(id) {
+  const gun = prompt("Kaç gün erteleyelim?", "3");
+  if (!gun || isNaN(gun)) return;
+  const h = hatirlatmalar.find(x => x.id === id);
+  if (!h) return;
+  const yeni = new Date(h.bitisT + 'T00:00:00');
+  yeni.setDate(yeni.getDate() + parseInt(gun));
+  await updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/hatirlatmalar/${id}`), { bitisT: yeni.toISOString().split("T")[0] });
+  showToast(`⏰ ${gun} gün ertelendi`);
+};
+
+window.hatirlatmaSil = async function(id) {
+  if (!confirm("Bu hatırlatma silinsin mi?")) return;
+  await deleteDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/hatirlatmalar/${id}`));
+  showToast("Silindi");
+};
 
 function homeGrupAc(grupId) {
   // Kovanlar sekmesine geç, o grubun kovanlarını göster
