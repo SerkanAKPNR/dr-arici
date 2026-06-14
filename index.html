@@ -1359,8 +1359,8 @@ function takvimGunDetayIcerik(tarihStr) {
   const gunSchedler = schedules.filter(s => s.date === tarihStr && !s.done);
   const gunNotlar = [];
   hives.forEach(h => {
-    (h.notlar||[]).forEach(n => {
-      if (n.bitisT === tarihStr && !n.tamamlandi) gunNotlar.push({hive:h, not:n});
+    (h.notlar||[]).forEach((n, idx) => {
+      if (n.bitisT === tarihStr && !n.tamamlandi) gunNotlar.push({hive:h, not:n, idx});
     });
   });
 
@@ -1369,20 +1369,40 @@ function takvimGunDetayIcerik(tarihStr) {
   let html = '';
   gunSchedler.forEach(s => {
     const hive = hives.find(h => h.id === s.hiveId);
-    html += `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--gray2)">
-      <div style="width:8px;height:8px;border-radius:50%;background:${typeRenk[s.type]||'var(--amber)'}"></div>
-      <span style="font-size:12px;color:var(--gray)">${iconMap[s.type]||''} ${s.type}</span>
-      <span style="font-size:13px;color:var(--brown);flex:1;font-weight:600">${s.drug}</span>
-      <span style="font-size:12px;color:var(--gray)">${hive?.name||'?'}. Kovan</span>
+    html += `
+    <div style="background:var(--cream2);border-radius:10px;padding:10px 12px;margin-bottom:8px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:${typeRenk[s.type]||'var(--amber)'}"></div>
+        <span style="font-size:11px;color:var(--gray)">${iconMap[s.type]||''} ${s.type}</span>
+        <span style="font-size:13px;color:var(--brown);flex:1;font-weight:600">${s.drug}</span>
+        <span style="font-size:12px;color:var(--gray);white-space:nowrap">${hive?.name||'?'}. Kovan</span>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button onclick="takvimSchedTamamla('${s.id}')"
+          style="flex:1;padding:5px;background:#22C55E;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit;font-weight:600">✅ Tamamlandı</button>
+        <button onclick="takvimSchedErtele('${s.id}')"
+          style="flex:1;padding:5px;background:var(--amber);color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit;font-weight:600">⏰ Ertele</button>
+      </div>
     </div>`;
   });
-  gunNotlar.forEach(({hive, not}) => {
+
+  gunNotlar.forEach(({hive, not, idx}) => {
     const kalip = not.kalip ? getKaliplar().find(k=>k.id===not.kalip) : null;
-    html += `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--gray2)">
-      <div style="width:8px;height:8px;border-radius:50%;background:var(--amber)"></div>
-      <span style="font-size:12px;color:var(--gray)">${kalip?kalip.ikon+' '+kalip.ad:'📝 Not'}</span>
-      <span style="font-size:13px;color:var(--brown);flex:1">${not.metin}</span>
-      <span style="font-size:12px;color:var(--gray)">${hive.name}. Kovan</span>
+    html += `
+    <div style="background:var(--cream2);border-radius:10px;padding:10px 12px;margin-bottom:8px">
+      <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px">
+        <div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px;background:var(--amber)"></div>
+        <div style="flex:1">
+          <div style="font-size:11px;color:var(--amber);font-weight:600;margin-bottom:2px">${kalip?kalip.ikon+' '+kalip.ad:'📝 Not'} · ${hive.name}. Kovan</div>
+          <div style="font-size:13px;color:var(--brown)">${not.metin}</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button onclick="takvimNotTamamla('${hive.id}',${idx})"
+          style="flex:1;padding:5px;background:#22C55E;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit;font-weight:600">✅ Tamamlandı</button>
+        <button onclick="takvimNotErtele('${hive.id}',${idx})"
+          style="flex:1;padding:5px;background:var(--amber);color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit;font-weight:600">⏰ Ertele</button>
+      </div>
     </div>`;
   });
   return html;
@@ -1395,8 +1415,60 @@ function renderTakvimGunDetay() {
   const d = new Date(_takvimSeciliGun + 'T00:00:00');
   const label = d.toLocaleDateString('tr-TR', {day:'numeric', month:'long', year:'numeric'});
   el.style.display = "";
-  el.innerHTML = `<div style="font-size:12px;font-weight:700;color:var(--amber);margin-bottom:6px">${label}</div>${takvimGunDetayIcerik(_takvimSeciliGun)}`;
+  el.style.maxHeight = "350px";
+  el.style.overflowY = "auto";
+  el.innerHTML = `<div style="font-size:12px;font-weight:700;color:var(--amber);margin-bottom:8px">${label}</div>${takvimGunDetayIcerik(_takvimSeciliGun)}`;
 }
+
+window.takvimSchedTamamla = async function(id) {
+  await updateDoc(doc(db, `users/${currentUser.uid}/takvim/${id}`), { done: true });
+  showToast("✅ Tamamlandı!");
+  await loadSchedules();
+  renderTakvimGunDetay();
+  renderAylikTakvim();
+};
+
+window.takvimSchedErtele = async function(id) {
+  const gun = prompt("Kaç gün erteleyelim?", "7");
+  if (!gun || isNaN(gun)) return;
+  const s = schedules.find(x => x.id === id);
+  if (!s) return;
+  const yeniT = new Date(s.date + 'T00:00:00');
+  yeniT.setDate(yeniT.getDate() + parseInt(gun));
+  await updateDoc(doc(db, `users/${currentUser.uid}/takvim/${id}`), { date: yeniT.toISOString().split("T")[0] });
+  showToast(`⏰ ${gun} gün ertelendi`);
+  await loadSchedules();
+  renderTakvimGunDetay();
+  renderAylikTakvim();
+};
+
+window.takvimNotTamamla = async function(hiveId, idx) {
+  const hive = hives.find(h => h.id === hiveId);
+  if (!hive) return;
+  const notlar = [...(hive.notlar || [])];
+  notlar[idx] = { ...notlar[idx], tamamlandi: true };
+  await updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${hiveId}`), { notlar });
+  hive.notlar = notlar;
+  showToast("✅ Tamamlandı!");
+  renderTakvimGunDetay();
+  renderAylikTakvim();
+};
+
+window.takvimNotErtele = async function(hiveId, idx) {
+  const gun = prompt("Kaç gün erteleyelim?", "7");
+  if (!gun || isNaN(gun)) return;
+  const hive = hives.find(h => h.id === hiveId);
+  if (!hive) return;
+  const notlar = [...(hive.notlar || [])];
+  const yeniT = new Date(notlar[idx].bitisT + 'T00:00:00');
+  yeniT.setDate(yeniT.getDate() + parseInt(gun));
+  notlar[idx] = { ...notlar[idx], bitisT: yeniT.toISOString().split("T")[0] };
+  await updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${hiveId}`), { notlar });
+  hive.notlar = notlar;
+  showToast(`⏰ ${gun} gün ertelendi`);
+  renderTakvimGunDetay();
+  renderAylikTakvim();
+};
 
 window.takvimAyDegis = function(yon) {
   _takvimAy += yon;
