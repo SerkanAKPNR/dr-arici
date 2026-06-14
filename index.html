@@ -610,6 +610,12 @@
       <div id="pos-selected" style="font-size:13px;color:var(--amber);margin-bottom:6px;min-height:18px"></div>
       <div id="mini-grid" style="overflow-x:auto;padding-bottom:4px"></div>
     </div>
+    <div id="duzenle-notlar-btn" style="display:none;margin-bottom:10px">
+      <button onclick="duzenledenNotlariAc()"
+        style="width:100%;padding:10px;border:1.5px dashed var(--amber);border-radius:10px;
+        background:var(--white);color:var(--amber);font-size:13px;font-weight:700;
+        cursor:pointer;font-family:inherit">📝 Notları Gör / Ekle</button>
+    </div>
     <div class="btn-row">
       <button class="btn btn-outline" id="hive-cancel">İptal</button>
       <button class="btn btn-primary" id="hive-save">Kaydet</button>
@@ -1213,6 +1219,7 @@ window.editHive = function(id) {
   if (!h) return;
   editingHiveId = id;
   $("hive-modal-title").textContent = "✏️ Kovan Düzenle";
+  $("duzenle-notlar-btn").style.display = "block";
   $("hive-name").value = h.name||"";
   populateHiveOriginSelect("hive-origin", h.originHiveId||"");
   populateGroupSelect("hive-group", h.group||"");
@@ -2098,6 +2105,13 @@ window.kovanDetayNavigate = function(dir) {
 };
 window.kovanDetayAc = kovanDetayAc;
 
+window.duzenledenNotlariAc = function() {
+  if (editingHiveId) {
+    closeModal("modal-hive");
+    notlarModalAc(editingHiveId);
+  }
+};
+
 // ─── KOVAN NOTLARI ───────────────────────────────────────────────
 let notEklenenHiveId = null;
 
@@ -2169,8 +2183,10 @@ async function hiveNotSil(hiveId, idx) {
   if (!hive) return;
   const notlar = [...(hive.notlar || [])];
   notlar.splice(idx, 1);
-  await updateDoc(doc(db, `users/${currentUser.uid}/kovanllar/${hiveId}`), { notlar });
+  await updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${hiveId}`), { notlar });
   showToast("Not silindi");
+  // Modalı yenile — Firestore onSnapshot günceller ama modalı yeniden açmak lazım
+  setTimeout(() => notlarModalAc(hiveId), 300);
 }
 
 // ─── KOVAN GEÇMİŞİ & İŞLEM ──────────────────────────────────────
@@ -2592,7 +2608,7 @@ function renderTopluHiveList() {
   const el = $("toplu-hive-list");
   if (!el) return;
   if (!hives.length) { el.innerHTML = '<div style="padding:10px;font-size:13px;color:var(--gray)">Kovan bulunamadı</div>'; return; }
-  el.innerHTML = hives.map(h => {
+  el.innerHTML = [...hives].sort((a,b) => parseInt(a.name||0) - parseInt(b.name||0)).map(h => {
     const sel = topluSeciliKovanlar.has(h.id);
     return `<label style="display:flex;align-items:center;gap:10px;padding:8px 6px;border-bottom:1px solid var(--gray2);cursor:pointer">
       <input type="checkbox" ${sel?"checked":""} onchange="topluToggleKovan('${h.id}',this.checked)"
@@ -2605,25 +2621,38 @@ function renderTopluHiveList() {
 }
 
 function renderTopluMiniKroki() {
+  renderKroki("toplu");
+}
+
+function renderTopluMiniKroki_UNUSED() {
   const el = $("toplu-mini-kroki");
   if (!el) return;
-  let html = `<div style="display:flex;flex-direction:column;gap:3px;min-width:${COLS*24}px">`;
+  // Sağdan sola, numaralı — ana krokilik aynı
+  let html = `<div style="display:flex;flex-direction:column;gap:3px;min-width:${COLS*22+18}px">`;
+  // Başlık
+  html += `<div style="display:flex;gap:2px;padding-left:18px">`;
+  for (let c = COLS-1; c >= 0; c--) {
+    html += `<div style="width:20px;text-align:center;font-size:8px;color:var(--gray);flex-shrink:0">${COLS-c}</div>`;
+  }
+  html += `</div>`;
   for (let r = 0; r < ROWS; r++) {
     html += `<div style="display:flex;gap:2px;align-items:center">`;
     html += `<span style="font-size:10px;color:var(--gray);width:14px;flex-shrink:0">${r+1}</span>`;
-    for (let c = 0; c < COLS; c++) {
+    for (let c = COLS-1; c >= 0; c--) {
       const hive = hiveAtPos(r, c);
       if (hive) {
         const sel = topluSeciliKovanlar.has(hive.id);
         html += `<div onclick="topluToggleKovan('${hive.id}',${!sel});renderTopluMiniKroki();renderTopluHiveList()"
-          title="${hive.name}. Kovan — Sıra ${r+1}, Sağdan ${COLS-c}"
-          style="width:18px;height:22px;border-radius:3px;
+          title="${hive.name}. Kovan"
+          style="width:20px;height:26px;border-radius:3px;position:relative;overflow:hidden;
           background:${sel ? hive.color||"#F59E0B" : "#E5E7EB"};
           border:2px solid ${sel ? (hive.color||"#F59E0B") : "#D1D5DB"};
           cursor:pointer;flex-shrink:0;transition:all .1s;
-          opacity:${sel?1:0.5}"></div>`;
+          display:flex;align-items:flex-end;justify-content:center;
+          font-size:8px;color:#fff;font-weight:800;padding-bottom:1px;
+          opacity:${sel?1:0.5}">${hive.name}</div>`;
       } else {
-        html += `<div style="width:18px;height:22px;border-radius:3px;background:#F9FAFB;border:1px dashed #E5E7EB;flex-shrink:0"></div>`;
+        html += `<div style="width:20px;height:26px;border-radius:3px;background:#F9FAFB;border:1px dashed #E5E7EB;flex-shrink:0"></div>`;
       }
     }
     html += `</div>`;
@@ -2832,23 +2861,27 @@ function krokiHucreHTML(hive, isSecili) {
 }
 
 
-function renderKroki() {
-  const el = $("kroki-grid");
+function renderKroki(mod) {
+  mod = mod || "normal";
+  const el = mod === "toplu" ? $("toplu-mini-kroki") : $("kroki-grid");
   if (!el) return;
-  let html = `<div style="display:flex;flex-direction:column;gap:6px;min-width:${COLS*28+24}px">`;
+  const hucreW = mod === "toplu" ? 20 : 24;
+  const hucreH = mod === "toplu" ? 26 : 36;
+  const gap = mod === "toplu" ? 2 : 4;
+  let html = `<div style="display:flex;flex-direction:column;gap:${gap}px;min-width:${COLS*(hucreW+gap)+22}px">`;
 
 
 
   // Başlık — sağdan sola: sağdan 1, 2, 3...
-  html += `<div style="display:flex;gap:4px;padding-left:22px">`;
+  html += `<div style="display:flex;gap:${gap}px;padding-left:22px">`;
   for (let c = COLS-1; c >= 0; c--) {
-    html += `<div style="width:24px;text-align:center;font-size:9px;color:var(--gray);flex-shrink:0">${COLS-c}</div>`;
+    html += `<div style="width:${hucreW}px;text-align:center;font-size:8px;color:var(--gray);flex-shrink:0">${COLS-c}</div>`;
   }
   html += `</div>`;
 
   for (let r = 0; r < ROWS; r++) {
-    html += `<div style="display:flex;gap:4px;align-items:center">`;
-    html += `<span style="font-size:11px;font-weight:700;color:var(--brown2);width:18px;flex-shrink:0">${r+1}</span>`;
+    html += `<div style="display:flex;gap:${gap}px;align-items:center">`;
+    html += `<span style="font-size:10px;font-weight:700;color:var(--brown2);width:18px;flex-shrink:0">${r+1}</span>`;
     // Sağdan sola çiz
     for (let c = COLS-1; c >= 0; c--) {
       const hive = hiveAtPos(r, c);
@@ -2856,17 +2889,22 @@ function renderKroki() {
         const isSecili = hive.id === krokiSeciliHiveId;
         html += krokiHucreHTML(hive, isSecili);
       } else {
-        html += `<div title="Sıra ${r+1}, Sağdan ${COLS-c} — Kovan ekle"
-          onclick="krokidenKovanEkle(${r},${c})"
-          style="width:24px;height:36px;border-radius:4px;background:#F9FAFB;border:1.5px dashed #D1D5DB;
-          cursor:pointer;flex-shrink:0;transition:background .15s"
-          onmouseover="this.style.background='#FEF3C7'" onmouseout="this.style.background='#F9FAFB'"></div>`;
+        if (mod === "toplu") {
+          html += `<div style="width:${hucreW}px;height:${hucreH}px;border-radius:3px;background:#F9FAFB;border:1px dashed #E5E7EB;flex-shrink:0"></div>`;
+        } else {
+          html += `<div title="Sıra ${r+1}, Sağdan ${COLS-c} — Kovan ekle"
+            onclick="krokidenKovanEkle(${r},${c})"
+            style="width:24px;height:36px;border-radius:4px;background:#F9FAFB;border:1.5px dashed #D1D5DB;
+            cursor:pointer;flex-shrink:0;transition:background .15s"
+            onmouseover="this.style.background='#FEF3C7'" onmouseout="this.style.background='#F9FAFB'"></div>`;
+        }
       }
     }
     html += `</div>`;
   }
   html += `</div>`;
 
+  if (mod === 'toplu') { el.innerHTML = html; return; }
   // Legend — gruplar
   const gruplar = getGruplar();
   html += `<div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:8px">`;
@@ -3226,6 +3264,7 @@ async function yedekYukle(event) {
 window.krokidenKovanEkle = function(row, col) {
   editingHiveId = null;
   $("hive-modal-title").textContent = "🐝 Yeni Kovan";
+  $("duzenle-notlar-btn").style.display = "none";
   ["hive-breed","hive-queen"].forEach(id => $(id).value = "");
   populateHiveOriginSelect("hive-origin", "");
   populateGroupSelect("hive-group", "");
@@ -3417,8 +3456,8 @@ function renderQueenKroki() {
   }
   html += `</div>`;
   for (let r = 0; r < QROWS; r++) {
-    html += `<div style="display:flex;gap:4px;align-items:center">`;
-    html += `<span style="font-size:11px;font-weight:700;color:var(--brown2);width:18px;flex-shrink:0">${r+1}</span>`;
+    html += `<div style="display:flex;gap:${gap}px;align-items:center">`;
+    html += `<span style="font-size:10px;font-weight:700;color:var(--brown2);width:18px;flex-shrink:0">${r+1}</span>`;
     for (let c = QCOLS-1; c >= 0; c--) {
       const hive = qhiveAtPos(r, c);
       if (hive) {
