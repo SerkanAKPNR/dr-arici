@@ -1490,6 +1490,8 @@ function renderSchedule() {
     .filter(s => !selectedHiveId || s.hiveId === selectedHiveId)
     .sort((a,b) => a.date > b.date ? 1 : -1);
 
+  renderAylikTakvim();
+
   if (!list.length) {
     el.innerHTML = `<div class="empty"><div class="empty-icon">📋</div><div class="empty-text">Görev bulunamadı</div></div>`;
     return;
@@ -2306,7 +2308,7 @@ function renderKovanDetayTam() {
             <div style="font-size:11px;color:var(--amber);font-weight:600;margin-bottom:2px">${n.tarih}</div>
             <div style="font-size:13px;color:var(--brown2)">${n.metin}</div>
           </div>
-          <button onclick="notDuzenleAc('${hive.id}',${hive.notlar.length-1-i},'detayTam')" style="background:none;border:none;color:var(--amber);cursor:pointer;font-size:14px;padding:0 2px;flex-shrink:0">✏️</button>
+          <button onclick="closeModal('modal-kovan-detay-tam');notDuzenleAc('${hive.id}',${hive.notlar.length-1-i},'detayTam')" style="background:none;border:none;color:var(--amber);cursor:pointer;font-size:14px;padding:0 2px;flex-shrink:0">✏️</button>
           <button onclick="hiveNotSilDetayTam('${hive.id}',${hive.notlar.length-1-i})" style="background:none;border:none;color:var(--gray);cursor:pointer;font-size:14px;padding:0 2px;flex-shrink:0">🗑️</button>
         </div>`).join('')}
     </div>` : ''}
