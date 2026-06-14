@@ -610,11 +610,13 @@
       <div id="pos-selected" style="font-size:13px;color:var(--amber);margin-bottom:6px;min-height:18px"></div>
       <div id="mini-grid" style="overflow-x:auto;padding-bottom:4px"></div>
     </div>
-    <div id="duzenle-notlar-btn" style="display:none;margin-bottom:10px">
-      <button onclick="duzenledenNotlariAc()"
-        style="width:100%;padding:10px;border:1.5px dashed var(--amber);border-radius:10px;
+    <div id="duzenle-notlar-bolumu" style="display:none;margin-bottom:10px">
+      <div style="font-size:13px;font-weight:700;color:var(--brown);margin-bottom:8px;padding-top:8px;border-top:1px dashed var(--gray2)">📝 Notlar</div>
+      <div id="duzenle-notlar-listesi" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px"></div>
+      <button onclick="duzenledenNotEkle()"
+        style="width:100%;padding:9px;border:1.5px dashed var(--amber);border-radius:10px;
         background:var(--white);color:var(--amber);font-size:13px;font-weight:700;
-        cursor:pointer;font-family:inherit">📝 Notları Gör / Ekle</button>
+        cursor:pointer;font-family:inherit">+ Not Ekle</button>
     </div>
     <div class="btn-row">
       <button class="btn btn-outline" id="hive-cancel">İptal</button>
@@ -1219,7 +1221,8 @@ window.editHive = function(id) {
   if (!h) return;
   editingHiveId = id;
   $("hive-modal-title").textContent = "✏️ Kovan Düzenle";
-  $("duzenle-notlar-btn").style.display = "block";
+  $("duzenle-notlar-bolumu").style.display = "block";
+  renderDuzenleNotlar(h);
   $("hive-name").value = h.name||"";
   populateHiveOriginSelect("hive-origin", h.originHiveId||"");
   populateGroupSelect("hive-group", h.group||"");
@@ -2105,12 +2108,51 @@ window.kovanDetayNavigate = function(dir) {
 };
 window.kovanDetayAc = kovanDetayAc;
 
-window.duzenledenNotlariAc = function() {
+function renderDuzenleNotlar(hive) {
+  const el = $("duzenle-notlar-listesi");
+  if (!el) return;
+  const h = hive || hives.find(h => h.id === editingHiveId);
+  if (!h) return;
+  const notlar = (h.notlar || []).slice().reverse();
+  el.innerHTML = notlar.length ? notlar.map((n, i) => `
+    <div style="background:var(--cream2);border-radius:8px;padding:8px 10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+        <span style="font-size:11px;color:var(--amber);font-weight:600">${n.tarih}</span>
+        <button onclick="duzenleNotSil(${notlar.length-1-i})" style="background:none;border:none;color:var(--gray);cursor:pointer;font-size:13px;padding:0">🗑️</button>
+      </div>
+      ${n.kalip ? (() => { const k = getKaliplar().find(x=>x.id===n.kalip); return k ? `<div style="font-size:11px;color:var(--amber);margin-bottom:2px">${k.ikon} ${k.ad}</div>` : ''; })() : ''}
+      <div style="font-size:13px;color:var(--brown2)">${n.metin}</div>
+    </div>`).join("") :
+    '<div style="font-size:12px;color:var(--gray);text-align:center;padding:8px">Henüz not yok</div>';
+}
+
+window.duzenledenNotEkle = function() {
   if (editingHiveId) {
-    closeModal("modal-hive");
-    notlarModalAc(editingHiveId);
+    notEklenenHiveId = editingHiveId;
+    $("hive-not-text").value = "";
+    seciliKalipId = null;
+    const el = $("kalip-secici");
+    if (el) el.innerHTML = getKaliplar().map(k =>
+      `<button onclick="kalipSec('${k.id}')" id="kalip-btn-${k.id}"
+        style="padding:5px 10px;border:1.5px solid var(--gray2);border-radius:20px;background:var(--white);
+        cursor:pointer;font-size:12px;font-family:inherit;color:var(--brown2)">${k.ikon} ${k.ad}</button>`
+    ).join("");
+    openModal("modal-hive-not");
   }
 };
+
+window.duzenleNotSil = async function(idx) {
+  if (!confirm("Bu not silinsin mi?")) return;
+  const hive = hives.find(h => h.id === editingHiveId);
+  if (!hive) return;
+  const notlar = [...(hive.notlar || [])];
+  notlar.splice(idx, 1);
+  await updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${editingHiveId}`), { notlar });
+  showToast("Not silindi");
+  renderDuzenleNotlar();
+};
+window.renderDuzenleNotlar = renderDuzenleNotlar;
+window.duzenleNotSil = duzenleNotSil;
 
 // ─── KOVAN NOTLARI ───────────────────────────────────────────────
 let notEklenenHiveId = null;
@@ -2175,6 +2217,8 @@ async function hiveNotKaydet() {
   await updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${notEklenenHiveId}`), { notlar });
   closeModal("modal-hive-not");
   showToast("Not eklendi ✓");
+  // Düzenleme modalı açıksa notları yenile
+  if (editingHiveId === notEklenenHiveId) setTimeout(() => renderDuzenleNotlar(), 300);
 }
 
 async function hiveNotSil(hiveId, idx) {
@@ -3263,7 +3307,7 @@ async function yedekYukle(event) {
 window.krokidenKovanEkle = function(row, col) {
   editingHiveId = null;
   $("hive-modal-title").textContent = "🐝 Yeni Kovan";
-  $("duzenle-notlar-btn").style.display = "none";
+  $("duzenle-notlar-bolumu").style.display = "none";
   ["hive-breed","hive-queen"].forEach(id => $(id).value = "");
   populateHiveOriginSelect("hive-origin", "");
   populateGroupSelect("hive-group", "");
