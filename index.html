@@ -507,7 +507,9 @@
       <div class="sec-title">Hesap</div>
       <div style="background:var(--white);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow)">
         <div style="font-size:13px;color:var(--gray);margin-bottom:12px" id="settings-email">—</div>
-        <button onclick="cikisYap()" style="width:100%;padding:11px;border:1.5px solid var(--gray2);border-radius:10px;background:var(--white);cursor:pointer;font-size:14px;color:var(--brown2);font-family:inherit">🚪 Çıkış Yap</button>
+        <button onclick="cikisYap()" style="width:100%;padding:11px;border:1.5px solid var(--gray2);border-radius:10px;background:var(--white);cursor:pointer;font-size:14px;color:var(--brown2);font-family:inherit;margin-bottom:8px">🚪 Çıkış Yap</button>
+        <button onclick="verileriSilOnay()" style="width:100%;padding:11px;border:1.5px solid #FCA5A5;border-radius:10px;background:var(--white);cursor:pointer;font-size:14px;color:#EF4444;font-family:inherit;margin-bottom:8px">🗑️ Tüm Verileri Sil</button>
+        <button onclick="hesabiSilOnay()" style="width:100%;padding:11px;border-radius:10px;background:#EF4444;color:#fff;border:none;cursor:pointer;font-size:14px;font-family:inherit;font-weight:700">❌ Hesabı Sil</button>
       </div>
     </div>
   </div>
@@ -705,6 +707,22 @@
 <div class="btn-row">
       <button class="btn btn-outline" onclick="closeModal('modal-hive-not')">İptal</button>
       <button class="btn btn-primary" id="hive-not-kaydet-btn" onclick="hiveNotKaydet()">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<!-- Şifre Doğrulama Modalı -->
+<div class="modal-overlay" id="modal-sifre-dogrula" style="z-index:60">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="sifre-modal-baslik">🔐 Şifre Doğrula</div>
+    <div style="font-size:13px;color:var(--gray);margin-bottom:14px" id="sifre-modal-aciklama"></div>
+    <div class="field">
+      <input type="password" class="input" id="sifre-dogrula-input" placeholder="Şifrenizi girin">
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-outline" onclick="closeModal('modal-sifre-dogrula')">İptal</button>
+      <button class="btn btn-primary" id="sifre-dogrula-btn" style="background:#EF4444">Onayla</button>
     </div>
   </div>
 </div>
@@ -928,8 +946,18 @@ onAuthStateChanged(auth, async (user) => {
       activeIsletmeId = user.uid;
       $("auth-screen").style.display = "none";
       $("app").style.display = "block";
-      // İşletme adını header'da göster
       const ayarSnap = await getDocs(collection(db, `users/${user.uid}/ayarlar`));
+      // admin_isletmeler'e yoksa ekle (admin görebilsin)
+      try {
+        const mevcutSnap = await getDocs(collection(db, "admin_isletmeler"));
+        const mevcut = mevcutSnap.docs.find(d => d.id === user.uid);
+        if (!mevcut) {
+          const isletmeAd = ayarSnap.docs[0]?.data()?.isletmeAd || user.email;
+          await setDoc(doc(db, "admin_isletmeler", user.uid), {
+            ad: isletmeAd, email: user.email, sahipUid: user.uid
+          });
+        }
+      } catch(e) {}
       loadAll();
     }
   } else {
@@ -4141,9 +4169,73 @@ window.kovanTasiKaydet = kovanTasiKaydet;
 
 window.kovanTasi = kovanTasi;
 window.cikisYap = function() {
-  [_unsubAyarlar,_unsubGelir,_unsubHives,_unsubSchedules,_unsubRecords,_unsubGecmis].forEach(u=>u&&u());
+  [_unsubAyarlar,_unsubGelir,_unsubHives,_unsubSchedules,_unsubRecords,_unsubGecmis,window._unsubHatir].forEach(u=>u&&u());
   signOut(auth);
 };
+
+window.verileriSilOnay = function() {
+  $("sifre-modal-baslik").textContent = "🗑️ Verileri Sil";
+  $("sifre-modal-aciklama").textContent = "Tüm kovan, kayıt ve takvim verileriniz silinecek. Bu işlem geri alınamaz. Devam etmek için şifrenizi girin.";
+  $("sifre-dogrula-input").value = "";
+  $("sifre-dogrula-btn").onclick = verileriSilYap;
+  openModal("modal-sifre-dogrula");
+};
+
+window.hesabiSilOnay = function() {
+  $("sifre-modal-baslik").textContent = "❌ Hesabı Sil";
+  $("sifre-modal-aciklama").textContent = "Hesabınız ve tüm verileriniz kalıcı olarak silinecek. Bu işlem geri alınamaz. Devam etmek için şifrenizi girin.";
+  $("sifre-dogrula-input").value = "";
+  $("sifre-dogrula-btn").onclick = hesabiSilYap;
+  openModal("modal-sifre-dogrula");
+};
+
+async function sifreDogrula() {
+  const { EmailAuthProvider, reauthenticateWithCredential } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js");
+  const sifre = $("sifre-dogrula-input").value;
+  if (!sifre) { showToast("Şifre boş olamaz"); return false; }
+  try {
+    const credential = EmailAuthProvider.credential(currentUser.email, sifre);
+    await reauthenticateWithCredential(currentUser, credential);
+    return true;
+  } catch(e) {
+    showToast("❌ Şifre yanlış!");
+    return false;
+  }
+}
+
+async function verileriSilYap() {
+  const ok = await sifreDogrula();
+  if (!ok) return;
+  closeModal("modal-sifre-dogrula");
+  showToast("Veriler siliniyor...");
+  const uid = activeIsletmeId || currentUser.uid;
+  const koleksiyonlar = ["kovanllar", "takvim", "kayitlar", "kovan_gecmis", "hatirlatmalar", "gelir_gider"];
+  for (const kol of koleksiyonlar) {
+    try {
+      const snap = await getDocs(collection(db, `users/${uid}/${kol}`));
+      for (const d of snap.docs) await deleteDoc(d.ref);
+    } catch(e) {}
+  }
+  showToast("✓ Tüm veriler silindi");
+}
+
+async function hesabiSilYap() {
+  const ok = await sifreDogrula();
+  if (!ok) return;
+  closeModal("modal-sifre-dogrula");
+  showToast("Hesap siliniyor...");
+  const uid = currentUser.uid;
+  const koleksiyonlar = ["kovanllar", "takvim", "kayitlar", "kovan_gecmis", "hatirlatmalar", "gelir_gider", "ayarlar"];
+  for (const kol of koleksiyonlar) {
+    try {
+      const snap = await getDocs(collection(db, `users/${uid}/${kol}`));
+      for (const d of snap.docs) await deleteDoc(d.ref);
+    } catch(e) {}
+  }
+  try { await deleteDoc(doc(db, "admin_isletmeler", uid)); } catch(e) {}
+  try { await currentUser.delete(); } catch(e) {}
+  showToast("Hesap silindi");
+}
 
 
 // ─── KRALİÇE KUTUSU KROKİ ────────────────────────────────────────
