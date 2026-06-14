@@ -1833,6 +1833,7 @@ document.querySelectorAll(".tab").forEach(btn => {
   btn.onclick = () => {
     activeTab = btn.dataset.tab;
     document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t === btn));
+    btn.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
     $("tab-hives").style.display   = activeTab === "hives"    ? "" : "none";
     $("tab-schedule").style.display = activeTab === "schedule" ? "" : "none";
     $("tab-records").style.display  = activeTab === "records"  ? "" : "none";
@@ -1942,6 +1943,7 @@ function applyTabOrder(order) {
     btn.onclick = () => {
       activeTab = btn.dataset.tab;
       document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t === btn));
+      btn.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
       $("tab-home").style.display     = activeTab === "home"     ? "" : "none";
       $("tab-hives").style.display    = activeTab === "hives"    ? "" : "none";
       $("tab-schedule").style.display = activeTab === "schedule" ? "" : "none";
