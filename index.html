@@ -3260,7 +3260,7 @@ function renderMiniQueenGrid() {
       if (isOccupied) { bg = hive.color || '#F59E0B'; border = hive.color || '#F59E0B'; cursor = 'not-allowed'; }
       else if (isSel) { bg = '#FCD34D'; border = '#D97706'; }
       html += `<div onclick="selectQueenPos(${r},${c})"
-        title="${isOccupied ? hive.name+'. Kovan' : `Sıra ${r+1}, Sağdan ${QCOLS-c}`}"
+        title="${isOccupied ? hive.name+'. Kovan' : 'Sıra '+(r+1)+', Sağdan '+(QCOLS-c)}"
         style="width:20px;height:20px;border-radius:3px;background:${bg};border:1.5px solid ${border};cursor:${cursor};flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;font-weight:700">
         ${isOccupied ? hive.name : ''}</div>`;
     }
@@ -3277,6 +3277,8 @@ window.selectQueenPos = function(r, c) {
   window._queenPos = {row: r, col: c};
   renderMiniQueenGrid();
 };
+
+function krokiHucreHTMLAlt(hive) {
   const color = hive.color || '#F59E0B';
   return '<div style="position:absolute;width:24px;height:36px;border-radius:4px;' +
     'background:' + color + ';opacity:0.4;top:0;left:0;border:2px solid ' + color + '"></div>';
