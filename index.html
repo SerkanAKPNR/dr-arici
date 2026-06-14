@@ -2185,7 +2185,6 @@ async function hiveNotSil(hiveId, idx) {
   notlar.splice(idx, 1);
   await updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${hiveId}`), { notlar });
   showToast("Not silindi");
-  // Modalı yenile — Firestore onSnapshot günceller ama modalı yeniden açmak lazım
   setTimeout(() => notlarModalAc(hiveId), 300);
 }
 
