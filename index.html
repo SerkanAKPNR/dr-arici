@@ -689,7 +689,7 @@
 
 
 <!-- MODAL: Kovan Not -->
-<div class="modal-overlay" id="modal-hive-not">
+<div class="modal-overlay" id="modal-hive-not" style="z-index:50">
   <div class="modal">
     <div class="modal-handle"></div>
     <div class="modal-title" id="hive-not-modal-baslik">📝 Not Ekle</div>
@@ -3710,7 +3710,7 @@ window.notlarModalAc = function(hiveId) {
         <div style="background:${tamamlandi ? '#F0FDF4' : gecti ? '#FFF7ED' : 'var(--cream2)'};border-radius:10px;padding:10px 12px;border:1px solid ${tamamlandi ? '#86EFAC' : gecti ? '#FED7AA' : 'transparent'}">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
             <span style="font-size:11px;color:var(--amber);font-weight:600">${n.tarih}${n.bitisT ? ` · ${new Date(n.bitisT).toLocaleDateString('tr-TR',{day:'numeric',month:'short'})} bitiş` : ''}</span>
-            <button onclick="notDuzenleAc('${hiveId}',${gercekIdx},'notlarModal')" style="background:none;border:none;color:var(--amber);cursor:pointer;font-size:13px;padding:0 2px">✏️</button>
+            <button onclick="closeModal('modal-kovan-detay');notDuzenleAc('${hiveId}',${gercekIdx},'notlarModal')" style="background:none;border:none;color:var(--amber);cursor:pointer;font-size:13px;padding:0 2px">✏️</button>
             <button onclick="notlarModalNotSil('${hiveId}',${gercekIdx})" style="background:none;border:none;color:var(--gray);cursor:pointer;font-size:13px;padding:0 4px">🗑️</button>
           </div>
           ${kalip ? `<div style="font-size:11px;color:var(--amber);margin-bottom:4px">${kalip.ikon} ${kalip.ad} ${tamamlandi ? '✅' : gecti ? '⚠️ Süresi geçti' : ''}</div>` : ''}
