@@ -2250,16 +2250,17 @@ function renderKovanDetayTam() {
   $("detay-nav-pos").textContent = navPos;
 
   // Ok butonları aktif/pasif
-  const hivePos = hive.pos;
+  const aktifPos = hive.qpos || hive.pos;
+  const kullaniQpos = !!hive.qpos;
   const yukari  = $("detay-nav-yukari");
   const asagi   = $("detay-nav-asagi");
   const sol     = $("detay-nav-sol");
   const sag     = $("detay-nav-sag");
-  if (hivePos) {
-    const varMiYukari = hives.some(h => h.pos && h.pos.col === hivePos.col && h.pos.row < hivePos.row);
-    const varMiAsagi  = hives.some(h => h.pos && h.pos.col === hivePos.col && h.pos.row > hivePos.row);
-    const varMiSol    = hives.some(h => h.pos && h.pos.row === hivePos.row && h.pos.col > hivePos.col);
-    const varMiSag    = hives.some(h => h.pos && h.pos.row === hivePos.row && h.pos.col < hivePos.col);
+  if (aktifPos) {
+    const varMiYukari = hives.some(h => (kullaniQpos ? h.qpos : h.pos) && (kullaniQpos ? h.qpos : h.pos).col === aktifPos.col && (kullaniQpos ? h.qpos : h.pos).row < aktifPos.row);
+    const varMiAsagi  = hives.some(h => (kullaniQpos ? h.qpos : h.pos) && (kullaniQpos ? h.qpos : h.pos).col === aktifPos.col && (kullaniQpos ? h.qpos : h.pos).row > aktifPos.row);
+    const varMiSol    = hives.some(h => (kullaniQpos ? h.qpos : h.pos) && (kullaniQpos ? h.qpos : h.pos).row === aktifPos.row && (kullaniQpos ? h.qpos : h.pos).col > aktifPos.col);
+    const varMiSag    = hives.some(h => (kullaniQpos ? h.qpos : h.pos) && (kullaniQpos ? h.qpos : h.pos).row === aktifPos.row && (kullaniQpos ? h.qpos : h.pos).col < aktifPos.col);
     if (yukari) yukari.style.opacity = varMiYukari ? "1" : "0.3";
     if (asagi)  asagi.style.opacity  = varMiAsagi  ? "1" : "0.3";
     if (sol)    sol.style.opacity    = varMiSol    ? "1" : "0.3";
@@ -2367,7 +2368,12 @@ function renderKovanDetayTam() {
 
 window.kovanDetayKroki = function(dRow, dCol) {
   const hive = hives.find(h => h.id === detayHiveId);
-  if (!hive || !hive.pos) {
+  if (!hive) return;
+
+  // Hangi pos kullanılacak — qpos mu pos mu?
+  const aktifPos = hive.qpos || hive.pos;
+
+  if (!aktifPos) {
     const list = getDetayList();
     const idx = list.findIndex(h => h.id === detayHiveId);
     const newIdx = idx + (dRow !== 0 ? dRow : dCol);
@@ -2376,22 +2382,27 @@ window.kovanDetayKroki = function(dRow, dCol) {
     renderKovanDetayTam();
     return;
   }
-  // Sağ/sol yönü kroki mantığına göre düzelt (sağdan sola = col azalır görsel sağ)
+
+  const kullaniQpos = !!hive.qpos;
   const gercekDCol = -dCol;
   let hedef = null;
+
   if (dRow !== 0) {
-    // Yukarı/aşağı: aynı sütunda ara, boş ise o yönde devam et
-    for (let r = hive.pos.row + dRow; r >= 0 && r < 100; r += dRow) {
-      hedef = hives.find(h => h.pos && h.pos.row === r && h.pos.col === hive.pos.col);
+    for (let r = aktifPos.row + dRow; r >= 0 && r < 100; r += dRow) {
+      hedef = kullaniQpos
+        ? hives.find(h => h.qpos && h.qpos.row === r && h.qpos.col === aktifPos.col)
+        : hives.find(h => h.pos  && h.pos.row  === r && h.pos.col  === aktifPos.col);
       if (hedef) break;
     }
   } else {
-    // Sol/sağ: aynı satırda ara, boş ise o yönde devam et
-    for (let c = hive.pos.col + gercekDCol; c >= 0 && c < 100; c += gercekDCol) {
-      hedef = hives.find(h => h.pos && h.pos.row === hive.pos.row && h.pos.col === c);
+    for (let c = aktifPos.col + gercekDCol; c >= 0 && c < 100; c += gercekDCol) {
+      hedef = kullaniQpos
+        ? hives.find(h => h.qpos && h.qpos.row === aktifPos.row && h.qpos.col === c)
+        : hives.find(h => h.pos  && h.pos.row  === aktifPos.row && h.pos.col  === c);
       if (hedef) break;
     }
   }
+
   if (!hedef) return;
   detayHiveId = hedef.id;
   renderKovanDetayTam();
