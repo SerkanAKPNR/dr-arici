@@ -69,8 +69,9 @@
   .stat-lbl { font-size: 10px; opacity: .85; white-space: nowrap; }
 
   /* TABS */
-  .tabs { display: flex; background: var(--white); border-bottom: 2px solid var(--gray2); position: sticky; top: 128px; z-index: 19; }
-  .tab { flex: 1; padding: 13px 8px; border: none; background: none; font-size: 13px; font-weight: 700; font-family: inherit; cursor: pointer; color: var(--gray); border-bottom: 3px solid transparent; margin-bottom: -2px; transition: all .2s; }
+  .tabs { display: flex; background: var(--white); border-bottom: 2px solid var(--gray2); position: sticky; top: 128px; z-index: 19; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { flex-shrink: 0; padding: 13px 12px; border: none; background: none; font-size: 13px; font-weight: 700; font-family: inherit; cursor: pointer; color: var(--gray); border-bottom: 3px solid transparent; margin-bottom: -2px; transition: all .2s; white-space: nowrap; }
   .tab.active { color: var(--amber); border-bottom-color: var(--amber); }
 
   /* CONTENT */
@@ -508,9 +509,9 @@
       <div class="sec-title">Hesap</div>
       <div style="background:var(--white);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow)">
         <div style="font-size:13px;color:var(--gray);margin-bottom:12px" id="settings-email">—</div>
-        <button id="btn-cikis-yap" style="width:100%;padding:11px;border:1.5px solid var(--gray2);border-radius:10px;background:var(--white);cursor:pointer;font-size:14px;color:var(--brown2);font-family:inherit;margin-bottom:8px">🚪 Çıkış Yap</button>
-        <button id="btn-veri-sil" style="width:100%;padding:11px;border:1.5px solid #FCA5A5;border-radius:10px;background:var(--white);cursor:pointer;font-size:14px;color:#EF4444;font-family:inherit;margin-bottom:8px">🗑️ Tüm Verileri Sil</button>
-        <button id="btn-hesap-sil" style="width:100%;padding:11px;border-radius:10px;background:#EF4444;color:#fff;border:none;cursor:pointer;font-size:14px;font-family:inherit;font-weight:700">❌ Hesabı Sil</button>
+        <button id="btn-cikis-yap" onclick="window.cikisYap()" style="width:100%;padding:11px;border:1.5px solid var(--gray2);border-radius:10px;background:var(--white);cursor:pointer;font-size:14px;color:var(--brown2);font-family:inherit;margin-bottom:8px">🚪 Çıkış Yap</button>
+        <button id="btn-veri-sil" onclick="window.verileriSilOnay()" style="width:100%;padding:11px;border:1.5px solid #FCA5A5;border-radius:10px;background:var(--white);cursor:pointer;font-size:14px;color:#EF4444;font-family:inherit;margin-bottom:8px">🗑️ Tüm Verileri Sil</button>
+        <button id="btn-hesap-sil" onclick="window.hesabiSilOnay()" style="width:100%;padding:11px;border-radius:10px;background:#EF4444;color:#fff;border:none;cursor:pointer;font-size:14px;font-family:inherit;font-weight:700">❌ Hesabı Sil</button>
       </div>
     </div>
   </div>
@@ -1039,7 +1040,7 @@ function showIsletmeSecim(isletmeler) {
         style="width:100%;padding:11px;border:1.5px dashed var(--gray2);border-radius:10px;background:none;color:var(--gray);cursor:pointer;font-size:14px;font-family:inherit;margin-bottom:8px">
         + Yeni İşletme Ekle
       </button>
-      <button onclick="signOut(auth)" style="background:none;border:none;color:var(--gray);cursor:pointer;font-size:13px;font-family:inherit">🚪 Çıkış Yap</button>
+      <button onclick="window.cikisYap()" style="background:none;border:none;color:var(--gray);cursor:pointer;font-size:13px;font-family:inherit">🚪 Çıkış Yap</button>
     </div>`;
 }
 
@@ -4213,12 +4214,6 @@ window.cikisYap = function() {
   [_unsubAyarlar,_unsubGelir,_unsubHives,_unsubSchedules,_unsubRecords,_unsubGecmis,window._unsubHatir].forEach(u=>u&&u());
   signOut(auth);
 };
-// Ayarlar butonlarını direkt bağla
-setTimeout(() => {
-  const bc = $("btn-cikis-yap"); if (bc) bc.onclick = window.cikisYap;
-  const bv = $("btn-veri-sil"); if (bv) bv.onclick = window.verileriSilOnay;
-  const bh = $("btn-hesap-sil"); if (bh) bh.onclick = window.hesabiSilOnay;
-}, 0);
 
 window.verileriSilOnay = function() {
   $("sifre-modal-baslik").textContent = "🗑️ Verileri Sil";
