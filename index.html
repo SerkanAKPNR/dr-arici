@@ -2114,15 +2114,28 @@ function renderDuzenleNotlar(hive) {
   const h = hive || hives.find(h => h.id === editingHiveId);
   if (!h) return;
   const notlar = (h.notlar || []).slice().reverse();
-  el.innerHTML = notlar.length ? notlar.map((n, i) => `
-    <div style="background:var(--cream2);border-radius:8px;padding:8px 10px">
+  el.innerHTML = notlar.length ? notlar.map((n, i) => {
+    const gercekIdx = notlar.length - 1 - i;
+    const kalip = n.kalip ? getKaliplar().find(x => x.id === n.kalip) : null;
+    const tamamlandi = n.tamamlandi;
+    const bugun = new Date(); bugun.setHours(0,0,0,0);
+    const gecti = n.bitisT && !tamamlandi && new Date(n.bitisT) <= bugun;
+    return `<div style="background:${tamamlandi ? '#F0FDF4' : gecti ? '#FFF7ED' : 'var(--cream2)'};border-radius:8px;padding:8px 10px;border:1px solid ${tamamlandi ? '#86EFAC' : gecti ? '#FED7AA' : 'transparent'}">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
-        <span style="font-size:11px;color:var(--amber);font-weight:600">${n.tarih}</span>
-        <button onclick="duzenleNotSil(${notlar.length-1-i})" style="background:none;border:none;color:var(--gray);cursor:pointer;font-size:13px;padding:0">🗑️</button>
+        <span style="font-size:11px;color:var(--amber);font-weight:600">${n.tarih}${n.bitisT ? ` · ${new Date(n.bitisT).toLocaleDateString('tr-TR',{day:'numeric',month:'short'})} bitiş` : ''}</span>
+        <button onclick="duzenleNotSil(${gercekIdx})" style="background:none;border:none;color:var(--gray);cursor:pointer;font-size:13px;padding:0">🗑️</button>
       </div>
-      ${n.kalip ? (() => { const k = getKaliplar().find(x=>x.id===n.kalip); return k ? `<div style="font-size:11px;color:var(--amber);margin-bottom:2px">${k.ikon} ${k.ad}</div>` : ''; })() : ''}
-      <div style="font-size:13px;color:var(--brown2)">${n.metin}</div>
-    </div>`).join("") :
+      ${kalip ? `<div style="font-size:11px;color:var(--amber);margin-bottom:4px">${kalip.ikon} ${kalip.ad} ${tamamlandi ? '✅' : gecti ? '⚠️ Süresi geçti' : ''}</div>` : ''}
+      <div style="font-size:13px;color:var(--brown2);${tamamlandi ? 'text-decoration:line-through;opacity:0.6' : ''}">${n.metin}</div>
+      ${kalip && !tamamlandi ? `
+      <div style="display:flex;gap:6px;margin-top:6px">
+        <button onclick="notTamamla(${gercekIdx})"
+          style="flex:1;padding:5px;background:#22C55E;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit;font-weight:600">✅ Tamamlandı</button>
+        <button onclick="notErtele(${gercekIdx})"
+          style="flex:1;padding:5px;background:var(--amber);color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit;font-weight:600">⏰ Ertele</button>
+      </div>` : ''}
+    </div>`;
+  }).join("") :
     '<div style="font-size:12px;color:var(--gray);text-align:center;padding:8px">Henüz not yok</div>';
 }
 
@@ -2153,6 +2166,30 @@ window.duzenleNotSil = async function(idx) {
 };
 window.renderDuzenleNotlar = renderDuzenleNotlar;
 window.duzenleNotSil = duzenleNotSil;
+
+window.notTamamla = async function(idx) {
+  const hive = hives.find(h => h.id === editingHiveId);
+  if (!hive) return;
+  const notlar = [...(hive.notlar || [])];
+  notlar[idx] = {...notlar[idx], tamamlandi: true};
+  await updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${editingHiveId}`), { notlar });
+  showToast("✅ Tamamlandı!");
+  renderDuzenleNotlar();
+};
+
+window.notErtele = async function(idx) {
+  const gun = prompt("Kaç gün erteleyelim?", "7");
+  if (!gun || isNaN(parseInt(gun))) return;
+  const hive = hives.find(h => h.id === editingHiveId);
+  if (!hive) return;
+  const notlar = [...(hive.notlar || [])];
+  const yeniBitis = new Date();
+  yeniBitis.setDate(yeniBitis.getDate() + parseInt(gun));
+  notlar[idx] = {...notlar[idx], bitisT: yeniBitis.toISOString().split("T")[0]};
+  await updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${editingHiveId}`), { notlar });
+  showToast(`⏰ ${gun} gün ertelendi`);
+  renderDuzenleNotlar();
+};
 
 // ─── KOVAN NOTLARI ───────────────────────────────────────────────
 let notEklenenHiveId = null;
