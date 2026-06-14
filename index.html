@@ -209,6 +209,7 @@
     <div id="auth-error" class="auth-error" style="display:none"></div>
     <input id="auth-email" class="input" type="email" placeholder="E-posta" autocomplete="email">
     <input id="auth-pass" class="input" type="password" placeholder="Şifre" autocomplete="current-password">
+    <input id="auth-isletme" class="input" type="text" placeholder="İşletme Adı (kayıt için)" style="display:none">
     <button class="btn btn-primary" id="btn-login">Giriş Yap</button>
     <button class="btn btn-secondary" id="btn-register">Hesap oluştur</button>
   </div>
@@ -507,9 +508,9 @@
       <div class="sec-title">Hesap</div>
       <div style="background:var(--white);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow)">
         <div style="font-size:13px;color:var(--gray);margin-bottom:12px" id="settings-email">—</div>
-        <button onclick="cikisYap()" style="width:100%;padding:11px;border:1.5px solid var(--gray2);border-radius:10px;background:var(--white);cursor:pointer;font-size:14px;color:var(--brown2);font-family:inherit;margin-bottom:8px">🚪 Çıkış Yap</button>
-        <button onclick="verileriSilOnay()" style="width:100%;padding:11px;border:1.5px solid #FCA5A5;border-radius:10px;background:var(--white);cursor:pointer;font-size:14px;color:#EF4444;font-family:inherit;margin-bottom:8px">🗑️ Tüm Verileri Sil</button>
-        <button onclick="hesabiSilOnay()" style="width:100%;padding:11px;border-radius:10px;background:#EF4444;color:#fff;border:none;cursor:pointer;font-size:14px;font-family:inherit;font-weight:700">❌ Hesabı Sil</button>
+        <button id="btn-cikis-yap" style="width:100%;padding:11px;border:1.5px solid var(--gray2);border-radius:10px;background:var(--white);cursor:pointer;font-size:14px;color:var(--brown2);font-family:inherit;margin-bottom:8px">🚪 Çıkış Yap</button>
+        <button id="btn-veri-sil" style="width:100%;padding:11px;border:1.5px solid #FCA5A5;border-radius:10px;background:var(--white);cursor:pointer;font-size:14px;color:#EF4444;font-family:inherit;margin-bottom:8px">🗑️ Tüm Verileri Sil</button>
+        <button id="btn-hesap-sil" style="width:100%;padding:11px;border-radius:10px;background:#EF4444;color:#fff;border:none;cursor:pointer;font-size:14px;font-family:inherit;font-weight:700">❌ Hesabı Sil</button>
       </div>
     </div>
   </div>
@@ -894,6 +895,7 @@ function closeModal(id) { $(id).classList.remove("open"); }
 
 // ─── AUTH ────────────────────────────────────────────────────────
 $("btn-login").onclick = async () => {
+  $("auth-isletme").style.display = "none";
   const e = $("auth-email").value.trim(), p = $("auth-pass").value;
   try {
     await signInWithEmailAndPassword(auth, e, p);
@@ -901,13 +903,43 @@ $("btn-login").onclick = async () => {
     showAuthError(err.code);
   }
 };
+
+let _kayitModu = false;
 $("btn-register").onclick = async () => {
-  const e = $("auth-email").value.trim(), p = $("auth-pass").value;
+  if (!_kayitModu) {
+    // İlk tık: işletme adı alanını göster, butonu "Kaydol" yap
+    _kayitModu = true;
+    $("auth-isletme").style.display = "";
+    $("auth-isletme").focus();
+    $("btn-register").textContent = "Kaydol";
+    $("btn-login").textContent = "← Giriş Yap";
+    $("btn-login").onclick = () => {
+      _kayitModu = false;
+      $("auth-isletme").style.display = "none";
+      $("btn-register").textContent = "Hesap oluştur";
+      $("btn-login").textContent = "Giriş Yap";
+      $("btn-login").onclick = loginHandler;
+    };
+    return;
+  }
+  const e = $("auth-email").value.trim();
+  const p = $("auth-pass").value;
+  const isletmeAd = $("auth-isletme").value.trim();
+  if (!isletmeAd) { showAuthError("isletme-bos"); return; }
   if (p.length < 6) { showAuthError("weak-password"); return; }
   try {
-    await createUserWithEmailAndPassword(auth, e, p);
+    const cred = await createUserWithEmailAndPassword(auth, e, p);
+    const uid = cred.user.uid;
+    await setDoc(doc(db, `users/${uid}/ayarlar/genel`), { isletmeAd, sahipEmail: e }, { merge: true });
+    await setDoc(doc(db, "admin_isletmeler", uid), { ad: isletmeAd, email: e, sahipUid: uid });
   } catch(err) { showAuthError(err.code); }
 };
+
+function loginHandler() {
+  $("auth-isletme").style.display = "none";
+  const e = $("auth-email").value.trim(), p = $("auth-pass").value;
+  signInWithEmailAndPassword(auth, e, p).catch(err => showAuthError(err.code));
+}
 $("btn-logout").onclick = () => {
   [_unsubAyarlar,_unsubGelir,_unsubHives,_unsubSchedules,_unsubRecords,_unsubGecmis].forEach(u=>u&&u());
   signOut(auth);
@@ -921,6 +953,7 @@ function showAuthError(code) {
     "auth/email-already-in-use": "Bu e-posta zaten kayıtlı.",
     "auth/invalid-credential": "E-posta veya şifre hatalı.",
     "weak-password": "Şifre en az 6 karakter olmalı.",
+    "isletme-bos": "İşletme adı boş olamaz.",
   };
   const el = $("auth-error");
   el.textContent = msgs[code] || "Bir hata oluştu.";
@@ -1977,6 +2010,13 @@ function renderSettings() {
   const colsEl = $("set-cols"); if (colsEl) colsEl.value = COLS;
   const qrowsEl = $("set-qrows"); if (qrowsEl) qrowsEl.value = QROWS;
   const qcolsEl = $("set-qcols"); if (qcolsEl) qcolsEl.value = QCOLS;
+  // Butonları her seferinde yeniden bağla
+  const btnCikis = $("btn-cikis-yap");
+  if (btnCikis) btnCikis.onclick = window.cikisYap;
+  const btnVeri = $("btn-veri-sil");
+  if (btnVeri) btnVeri.onclick = window.verileriSilOnay;
+  const btnHesap = $("btn-hesap-sil");
+  if (btnHesap) btnHesap.onclick = window.hesabiSilOnay;
   renderTabOrderList();
   renderGrupListesi();
   renderTipListesi();
@@ -4172,7 +4212,6 @@ window.cikisYap = function() {
   [_unsubAyarlar,_unsubGelir,_unsubHives,_unsubSchedules,_unsubRecords,_unsubGecmis,window._unsubHatir].forEach(u=>u&&u());
   signOut(auth);
 };
-
 window.verileriSilOnay = function() {
   $("sifre-modal-baslik").textContent = "🗑️ Verileri Sil";
   $("sifre-modal-aciklama").textContent = "Tüm kovan, kayıt ve takvim verileriniz silinecek. Bu işlem geri alınamaz. Devam etmek için şifrenizi girin.";
