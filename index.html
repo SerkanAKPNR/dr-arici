@@ -2076,12 +2076,18 @@ function renderKovanDetayTam() {
       ${bekleyenler.length > 4 ? `<div style="font-size:12px;color:var(--gray);margin-top:6px">+${bekleyenler.length-4} görev daha</div>` : ''}
     </div>` : ''}
 
-    <!-- Son not -->
+    <!-- Notlar -->
     ${(hive.notlar||[]).length ? `
     <div style="background:var(--white);border:1.5px solid var(--gray2);border-radius:12px;padding:12px;margin-bottom:10px">
-      <div style="font-size:11px;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Son Not</div>
-      <div style="font-size:11px;color:var(--amber);font-weight:600;margin-bottom:4px">${hive.notlar[hive.notlar.length-1].tarih}</div>
-      <div style="font-size:14px;color:var(--brown2)">${hive.notlar[hive.notlar.length-1].metin}</div>
+      <div style="font-size:11px;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Notlar (${hive.notlar.length})</div>
+      ${[...(hive.notlar)].reverse().map((n,i) => `
+        <div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px solid var(--gray2)">
+          <div style="flex:1">
+            <div style="font-size:11px;color:var(--amber);font-weight:600;margin-bottom:2px">${n.tarih}</div>
+            <div style="font-size:13px;color:var(--brown2)">${n.metin}</div>
+          </div>
+          <button onclick="hiveNotSilDetayTam('${hive.id}',${hive.notlar.length-1-i})" style="background:none;border:none;color:var(--gray);cursor:pointer;font-size:14px;padding:0 2px;flex-shrink:0">🗑️</button>
+        </div>`).join('')}
     </div>` : ''}
 
     <!-- Butonlar -->
@@ -2193,6 +2199,7 @@ window.notErtele = async function(idx) {
 
 // ─── KOVAN NOTLARI ───────────────────────────────────────────────
 let notEklenenHiveId = null;
+let notEklenenKaynak = null; // 'kroki' | 'notlarModal' | null
 
 function renderHiveNotes(h) {
   const notlar = (h.notlar || []).slice().reverse();
@@ -2219,6 +2226,7 @@ let seciliKalipId = null;
 
 function notEkleAc(hiveId) {
   notEklenenHiveId = hiveId;
+  notEklenenKaynak = null;
   $("hive-not-text").value = "";
   seciliKalipId = null;
   // Kalıp butonlarını doldur
@@ -2232,6 +2240,40 @@ function notEkleAc(hiveId) {
   }
   openModal("modal-hive-not");
 }
+
+function notEkleAcKroki(hiveId) {
+  notEklenenHiveId = hiveId;
+  notEklenenKaynak = 'kroki';
+  $("hive-not-text").value = "";
+  seciliKalipId = null;
+  const el = $("kalip-secici");
+  if (el) {
+    el.innerHTML = getKaliplar().map(k =>
+      `<button onclick="kalipSec('${k.id}')" id="kalip-btn-${k.id}"
+        style="padding:5px 10px;border:1.5px solid var(--gray2);border-radius:20px;background:var(--white);
+        cursor:pointer;font-size:12px;font-family:inherit;color:var(--brown2)">${k.ikon} ${k.ad}</button>`
+    ).join("");
+  }
+  openModal("modal-hive-not");
+}
+window.notEkleAcKroki = notEkleAcKroki;
+
+function notEkleAcNotlarModal(hiveId) {
+  notEklenenHiveId = hiveId;
+  notEklenenKaynak = 'notlarModal';
+  $("hive-not-text").value = "";
+  seciliKalipId = null;
+  const el = $("kalip-secici");
+  if (el) {
+    el.innerHTML = getKaliplar().map(k =>
+      `<button onclick="kalipSec('${k.id}')" id="kalip-btn-${k.id}"
+        style="padding:5px 10px;border:1.5px solid var(--gray2);border-radius:20px;background:var(--white);
+        cursor:pointer;font-size:12px;font-family:inherit;color:var(--brown2)">${k.ikon} ${k.ad}</button>`
+    ).join("");
+  }
+  openModal("modal-hive-not");
+}
+window.notEkleAcNotlarModal = notEkleAcNotlarModal;
 
 async function hiveNotKaydet() {
   const metin = $("hive-not-text").value.trim();
@@ -2254,8 +2296,15 @@ async function hiveNotKaydet() {
   await updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${notEklenenHiveId}`), { notlar });
   closeModal("modal-hive-not");
   showToast("Not eklendi ✓");
-  // Düzenleme modalı açıksa notları yenile
-  if (editingHiveId === notEklenenHiveId) setTimeout(() => renderDuzenleNotlar(), 300);
+  // Nereden gelindi?
+  if (editingHiveId === notEklenenHiveId) {
+    setTimeout(() => renderDuzenleNotlar(), 300);
+  } else if (notEklenenKaynak === 'kroki') {
+    setTimeout(() => krokiAyrintilariGoster(notEklenenHiveId, true), 300);
+  } else if (notEklenenKaynak === 'notlarModal') {
+    setTimeout(() => notlarModalAc(notEklenenHiveId), 300);
+  }
+  notEklenenKaynak = null;
 }
 
 async function hiveNotSil(hiveId, idx) {
@@ -2268,6 +2317,19 @@ async function hiveNotSil(hiveId, idx) {
   showToast("Not silindi");
   setTimeout(() => notlarModalAc(hiveId), 300);
 }
+
+async function hiveNotSilDetayTam(hiveId, idx) {
+  if (!confirm("Bu not silinsin mi?")) return;
+  const hive = hives.find(h => h.id === hiveId);
+  if (!hive) return;
+  const notlar = [...(hive.notlar || [])];
+  notlar.splice(idx, 1);
+  await updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${hiveId}`), { notlar });
+  hive.notlar = notlar;
+  showToast("Not silindi");
+  renderKovanDetayTam();
+}
+window.hiveNotSilDetayTam = hiveNotSilDetayTam;
 
 // ─── KOVAN GEÇMİŞİ & İŞLEM ──────────────────────────────────────
 let kovanGecmis = [];
@@ -3101,7 +3163,7 @@ function krokiAyrintilariGoster(id, krokiMod) {
     <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
       <button onclick="closeModal('modal-kovan-detay');editHive('${hive.id}')"
         style="flex:1;padding:10px;border:1px solid var(--gray2);border-radius:10px;background:var(--white);cursor:pointer;font-size:13px;font-family:inherit;min-width:80px">✏️ Düzenle</button>
-      <button onclick="closeModal('modal-kovan-detay');notEkleAc('${hive.id}')"
+      <button onclick="closeModal('modal-kovan-detay');notEkleAcKroki('${hive.id}')"
         style="flex:1;padding:10px;border:1px solid var(--amber);border-radius:10px;background:var(--white);color:var(--amber);cursor:pointer;font-size:13px;font-weight:700;font-family:inherit;min-width:80px">📝 Not</button>
       ${krokiMod ? `<button onclick="closeModal('modal-kovan-detay');krokiTasiModuBaslat('${hive.id}')"
         style="flex:1;padding:10px;border:none;border-radius:10px;background:var(--amber);color:#fff;cursor:pointer;font-size:13px;font-weight:700;font-family:inherit;min-width:80px">↔️ Taşı</button>` :
@@ -3368,6 +3430,7 @@ window.notlarModalAc = function(hiveId) {
   const hive = hives.find(h => h.id === hiveId);
   if (!hive) return;
   const notlar = (hive.notlar || []).slice().reverse();
+  const bugun = new Date(); bugun.setHours(0,0,0,0);
   $("kovan-detay-icerik").innerHTML = `
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
       <div style="flex:1">
@@ -3376,20 +3439,72 @@ window.notlarModalAc = function(hiveId) {
       <button onclick="closeModal('modal-kovan-detay')" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--gray)">✕</button>
     </div>
     <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">
-      ${notlar.map((n, i) => `
-        <div style="background:var(--cream2);border-radius:10px;padding:10px 12px">
+      ${notlar.map((n, i) => {
+        const gercekIdx = notlar.length - 1 - i;
+        const kalip = n.kalip ? getKaliplar().find(x => x.id === n.kalip) : null;
+        const tamamlandi = n.tamamlandi;
+        const gecti = n.bitisT && !tamamlandi && new Date(n.bitisT) <= bugun;
+        return `
+        <div style="background:${tamamlandi ? '#F0FDF4' : gecti ? '#FFF7ED' : 'var(--cream2)'};border-radius:10px;padding:10px 12px;border:1px solid ${tamamlandi ? '#86EFAC' : gecti ? '#FED7AA' : 'transparent'}">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-            <button onclick="hiveNotSil('${hiveId}',${notlar.length-1-i});closeModal('modal-kovan-detay')" style="background:none;border:none;color:var(--gray);cursor:pointer;font-size:13px;padding:0 4px">🗑️</button>
-            <span style="font-size:11px;color:var(--amber);font-weight:600">${n.tarih}</span>
+            <span style="font-size:11px;color:var(--amber);font-weight:600">${n.tarih}${n.bitisT ? ` · ${new Date(n.bitisT).toLocaleDateString('tr-TR',{day:'numeric',month:'short'})} bitiş` : ''}</span>
+            <button onclick="notlarModalNotSil('${hiveId}',${gercekIdx})" style="background:none;border:none;color:var(--gray);cursor:pointer;font-size:13px;padding:0 4px">🗑️</button>
           </div>
-          <div style="font-size:14px;color:var(--brown2)">${n.metin}</div>
-        </div>`).join("")}
+          ${kalip ? `<div style="font-size:11px;color:var(--amber);margin-bottom:4px">${kalip.ikon} ${kalip.ad} ${tamamlandi ? '✅' : gecti ? '⚠️ Süresi geçti' : ''}</div>` : ''}
+          <div style="font-size:14px;color:var(--brown2);${tamamlandi ? 'text-decoration:line-through;opacity:0.6' : ''}">${n.metin}</div>
+          ${kalip && !tamamlandi ? `
+          <div style="display:flex;gap:6px;margin-top:6px">
+            <button onclick="notlarModalTamamla('${hiveId}',${gercekIdx})"
+              style="flex:1;padding:5px;background:#22C55E;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit;font-weight:600">✅ Tamamlandı</button>
+            <button onclick="notlarModalErtele('${hiveId}',${gercekIdx})"
+              style="flex:1;padding:5px;background:var(--amber);color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit;font-weight:600">⏰ Ertele</button>
+          </div>` : ''}
+        </div>`;
+      }).join("")}
     </div>
-    <button onclick="closeModal('modal-kovan-detay');notEkleAc('${hiveId}')"
+    <button onclick="closeModal('modal-kovan-detay');notEkleAcNotlarModal('${hiveId}')"
       style="width:100%;padding:11px;background:var(--amber);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">
       📝 Yeni Not Ekle
     </button>`;
   openModal("modal-kovan-detay");
+};
+
+window.notlarModalNotSil = async function(hiveId, idx) {
+  if (!confirm("Bu not silinsin mi?")) return;
+  const hive = hives.find(h => h.id === hiveId);
+  if (!hive) return;
+  const notlar = [...(hive.notlar || [])];
+  notlar.splice(idx, 1);
+  await updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${hiveId}`), { notlar });
+  hive.notlar = notlar;
+  showToast("Not silindi");
+  notlarModalAc(hiveId);
+};
+
+window.notlarModalTamamla = async function(hiveId, idx) {
+  const hive = hives.find(h => h.id === hiveId);
+  if (!hive) return;
+  const notlar = [...(hive.notlar || [])];
+  notlar[idx] = { ...notlar[idx], tamamlandi: true };
+  await updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${hiveId}`), { notlar });
+  hive.notlar = notlar;
+  showToast("✅ Tamamlandı!");
+  notlarModalAc(hiveId);
+};
+
+window.notlarModalErtele = async function(hiveId, idx) {
+  const gun = prompt("Kaç gün erteleyelim?", "7");
+  if (!gun || isNaN(gun)) return;
+  const hive = hives.find(h => h.id === hiveId);
+  if (!hive) return;
+  const notlar = [...(hive.notlar || [])];
+  const yeniT = new Date();
+  yeniT.setDate(yeniT.getDate() + parseInt(gun));
+  notlar[idx] = { ...notlar[idx], bitisT: yeniT.toISOString().split("T")[0] };
+  await updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${hiveId}`), { notlar });
+  hive.notlar = notlar;
+  showToast(`⏰ ${gun} gün ertelendi`);
+  notlarModalAc(hiveId);
 };
 
 window.krokiTasiModuBaslat = function(id) {
