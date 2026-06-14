@@ -722,12 +722,22 @@
     <!-- İçerik — scroll -->
     <div id="kovan-detay-tam-icerik" style="flex:1;overflow-y:auto;padding-bottom:8px"></div>
     <!-- Navigasyon — altta sabit -->
-    <div style="flex-shrink:0;display:flex;align-items:center;gap:12px;padding:12px 20px;border-top:1px solid var(--gray2);background:var(--white)">
-      <button onclick="kovanDetayNavigate(-1)"
-        style="flex:1;background:var(--amber);color:#fff;border:none;border-radius:12px;height:48px;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center">▲</button>
-      <div id="detay-nav-pos" style="font-size:13px;color:var(--gray);font-family:monospace;font-weight:600;text-align:center;min-width:50px"></div>
-      <button onclick="kovanDetayNavigate(1)"
-        style="flex:1;background:var(--amber);color:#fff;border:none;border-radius:12px;height:48px;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center">▼</button>
+    <div style="flex-shrink:0;padding:10px 20px;border-top:1px solid var(--gray2);background:var(--white)">
+      <div style="display:grid;grid-template-columns:48px 1fr 48px;grid-template-rows:40px 40px;gap:4px;align-items:center;justify-items:center">
+        <!-- Üst ok -->
+        <div></div>
+        <button id="detay-nav-yukari" onclick="kovanDetayKroki(-1,0)"
+          style="width:100%;height:36px;background:var(--amber);color:#fff;border:none;border-radius:10px;font-size:18px;cursor:pointer">▲</button>
+        <div></div>
+        <!-- Sol / Orta / Sağ -->
+        <button id="detay-nav-sol" onclick="kovanDetayKroki(0,-1)"
+          style="width:44px;height:36px;background:var(--amber);color:#fff;border:none;border-radius:10px;font-size:18px;cursor:pointer">◄</button>
+        <div id="detay-nav-pos" style="font-size:12px;color:var(--gray);font-family:monospace;font-weight:600;text-align:center"></div>
+        <button id="detay-nav-sag" onclick="kovanDetayKroki(0,1)"
+          style="width:44px;height:36px;background:var(--amber);color:#fff;border:none;border-radius:10px;font-size:18px;cursor:pointer">►</button>
+      </div>
+      <button id="detay-nav-asagi" onclick="kovanDetayKroki(1,0)"
+        style="width:100%;height:36px;background:var(--amber);color:#fff;border:none;border-radius:10px;font-size:18px;cursor:pointer;margin-top:4px">▼</button>
     </div>
   </div>
 </div>
@@ -2240,8 +2250,24 @@ function renderKovanDetayTam() {
   $("detay-nav-pos").textContent = navPos;
 
   // Ok butonları aktif/pasif
-  document.querySelector('#modal-kovan-detay-tam button[onclick*="-1"]').style.opacity = idx <= 0 ? "0.3" : "1";
-  document.querySelector('#modal-kovan-detay-tam button[onclick*="1"]').style.opacity = idx >= list.length-1 ? "0.3" : "1";
+  const hivePos = hive.pos;
+  const yukari  = $("detay-nav-yukari");
+  const asagi   = $("detay-nav-asagi");
+  const sol     = $("detay-nav-sol");
+  const sag     = $("detay-nav-sag");
+  if (hivePos) {
+    if (yukari) yukari.style.opacity = hives.find(h => h.pos && h.pos.row === hivePos.row-1 && h.pos.col === hivePos.col) ? "1" : "0.3";
+    if (asagi)  asagi.style.opacity  = hives.find(h => h.pos && h.pos.row === hivePos.row+1 && h.pos.col === hivePos.col) ? "1" : "0.3";
+    if (sol)    sol.style.opacity    = hives.find(h => h.pos && h.pos.row === hivePos.row && h.pos.col === hivePos.col-1) ? "1" : "0.3";
+    if (sag)    sag.style.opacity    = hives.find(h => h.pos && h.pos.row === hivePos.row && h.pos.col === hivePos.col+1) ? "1" : "0.3";
+  } else {
+    const list2 = getDetayList();
+    const idx2  = list2.findIndex(h => h.id === detayHiveId);
+    if (yukari) yukari.style.opacity = idx2 > 0 ? "1" : "0.3";
+    if (asagi)  asagi.style.opacity  = idx2 < list2.length-1 ? "1" : "0.3";
+    if (sol)    sol.style.opacity    = "0.3";
+    if (sag)    sag.style.opacity    = "0.3";
+  }
 
   // Bekleyen görevler
   const bekleyenler = schedules.filter(s => s.hiveId === hive.id && !s.done);
@@ -2335,14 +2361,27 @@ function renderKovanDetayTam() {
   `;
 }
 
-window.kovanDetayNavigate = function(dir) {
-  const list = getDetayList();
-  const idx = list.findIndex(h => h.id === detayHiveId);
-  const newIdx = idx + dir;
-  if (newIdx < 0 || newIdx >= list.length) return;
-  detayHiveId = list[newIdx].id;
+window.kovanDetayKroki = function(dRow, dCol) {
+  const hive = hives.find(h => h.id === detayHiveId);
+  if (!hive || !hive.pos) {
+    // Kroki pozisyonu yoksa liste sırasına göre git
+    const list = getDetayList();
+    const idx = list.findIndex(h => h.id === detayHiveId);
+    const newIdx = idx + (dRow !== 0 ? dRow : dCol);
+    if (newIdx < 0 || newIdx >= list.length) return;
+    detayHiveId = list[newIdx].id;
+    renderKovanDetayTam();
+    return;
+  }
+  const hedefRow = hive.pos.row + dRow;
+  const hedefCol = hive.pos.col + dCol;
+  // O pozisyonda kovan var mı?
+  const hedef = hives.find(h => h.pos && h.pos.row === hedefRow && h.pos.col === hedefCol);
+  if (!hedef) return;
+  detayHiveId = hedef.id;
   renderKovanDetayTam();
 };
+window.kovanDetayNavigate = window.kovanDetayKroki; // geriye dönük uyumluluk
 window.kovanDetayAc = kovanDetayAc;
 
 function renderDuzenleNotlar(hive) {
