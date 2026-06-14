@@ -3914,7 +3914,7 @@ function renderQueenKroki() {
   }
   html += `</div>`;
   for (let r = 0; r < QROWS; r++) {
-    html += `<div style="display:flex;gap:${gap}px;align-items:center">`;
+    html += `<div style="display:flex;gap:4px;align-items:center">`;
     html += `<span style="font-size:10px;font-weight:700;color:var(--brown2);width:18px;flex-shrink:0">${r+1}</span>`;
     for (let c = QCOLS-1; c >= 0; c--) {
       const hive = qhiveAtPos(r, c);
