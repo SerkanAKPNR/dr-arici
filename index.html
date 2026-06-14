@@ -621,6 +621,10 @@
       <div id="pos-selected" style="font-size:13px;color:var(--amber);margin-bottom:6px;min-height:18px"></div>
       <div id="mini-grid" style="overflow-x:auto;padding-bottom:4px"></div>
     </div>
+    <div id="queen-pos-bilgi" style="display:none;margin-bottom:10px;padding:10px 12px;background:#FFF9E6;border-radius:10px;border:1.5px solid var(--amber3)">
+      <div style="font-size:12px;font-weight:700;color:var(--amber)">👑 Kraliçe Kutusu Konumu</div>
+      <div id="queen-pos-label" style="font-size:13px;color:var(--brown);margin-top:2px"></div>
+    </div>
     <div id="duzenle-notlar-bolumu" style="display:none;margin-bottom:10px">
       <div style="font-size:13px;font-weight:700;color:var(--brown);margin-bottom:8px;padding-top:8px;border-top:1px dashed var(--gray2)">📝 Notlar</div>
       <div id="duzenle-notlar-listesi" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px"></div>
@@ -1729,6 +1733,7 @@ $("fab-btn").onclick = () => {
     $("hive-strength").value = 5; $("hive-strength-val").textContent = 5;
     selectedPos = null;
     window._queenPos = null;
+    const qb2 = $("queen-pos-bilgi"); if (qb2) qb2.style.display = "none";
     updatePosLabel();
     renderMiniGrid();
     renderColorPicker(HIVE_COLORS[0]);
@@ -3953,6 +3958,13 @@ window.queendenKovanEkle = function(row, col) {
   updatePosLabel();
   renderMiniGrid();
   renderColorPicker(HIVE_COLORS[0]);
+  // Kraliçe kutusu bilgisini göster
+  const qBilgi = $("queen-pos-bilgi");
+  const qLabel = $("queen-pos-label");
+  if (qBilgi && qLabel) {
+    qLabel.textContent = `Sıra ${row+1}, Sağdan ${QCOLS-col}. hücre`;
+    qBilgi.style.display = "";
+  }
   openModal("modal-hive");
   setTimeout(() => renderKatCitaFields(), 50);
 };
