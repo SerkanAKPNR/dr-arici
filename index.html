@@ -1002,15 +1002,21 @@ onAuthStateChanged(auth, async (user) => {
 async function getIsletmeler() {
   const isletmeler = [];
   try {
-    // Admin tüm users/ altındaki ayarlar/genel'i okur
-    // Basit çözüm: bilinen UID'leri Firestore'da sakla
     const adminDoc = await getDocs(collection(db, "admin_isletmeler"));
     adminDoc.forEach(d => isletmeler.push({ uid: d.id, ...d.data() }));
     // Kendi uid'ini de ekle
     if (!isletmeler.find(i => i.uid === currentUser.uid)) {
-      isletmeler.push({ uid: currentUser.uid, ad: "Ana Arılık" });
+      isletmeler.push({ uid: currentUser.uid, ad: "Ana Arılık", email: currentUser.email });
     }
-  } catch(e) { isletmeler.push({ uid: currentUser.uid, ad: "Ana Arılık" }); }
+    // Eski verilerin bulunduğu UID'i ekle (geçiş için)
+    const eskiUid = "a49Jsp3MbcSjjaz9rDgGNEVi9kt2";
+    if (!isletmeler.find(i => i.uid === eskiUid)) {
+      isletmeler.unshift({ uid: eskiUid, ad: "Ana Arılık (Veriler)", email: currentUser.email });
+    }
+  } catch(e) {
+    isletmeler.push({ uid: currentUser.uid, ad: "Ana Arılık", email: currentUser.email });
+    isletmeler.unshift({ uid: "a49Jsp3MbcSjjaz9rDgGNEVi9kt2", ad: "Ana Arılık (Veriler)", email: currentUser.email });
+  }
   return isletmeler;
 }
 
