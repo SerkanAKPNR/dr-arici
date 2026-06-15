@@ -285,6 +285,10 @@
     <div id="gelir-content"></div>
   </div>
 
+  <div class="content" id="tab-analiz" style="display:none">
+    <div id="analiz-content"><div class="loading">⏳</div></div>
+  </div>
+
   <div class="content" id="tab-gecmis" style="display:none">
     <div id="gecmis-content"><div class="loading">⏳</div></div>
   </div>
@@ -1906,6 +1910,7 @@ const TAB_DEFS = [
   { key: "records",  label: "📝 Kayıtlar" },
   { key: "gecmis",   label: "📜 Geçmiş" },
   { key: "gelir",    label: "💰 Gelir/Gider" },
+  { key: "analiz",   label: "📊 Analiz" },
 ];
 
 function getTabOrder() {
@@ -1950,12 +1955,14 @@ function applyTabOrder(order) {
       $("tab-records").style.display  = activeTab === "records"  ? "" : "none";
       $("tab-gecmis").style.display   = activeTab === "gecmis"   ? "" : "none";
       $("tab-gelir").style.display    = activeTab === "gelir"    ? "" : "none";
+      $("tab-analiz").style.display   = activeTab === "analiz"   ? "" : "none";
       $("tab-kroki").style.display    = activeTab === "kroki"    ? "" : "none";
       $("tab-settings").style.display = activeTab === "settings" ? "" : "none";
       if (activeTab === "kroki") { renderKroki(); renderQueenKroki(); }
       if (activeTab === "schedule") { renderSchedule(); }
       if (activeTab === "settings") renderSettings();
       if (activeTab === "home") renderHome();
+      if (activeTab === "analiz") renderAnaliz();
       updateFabVisibility();
     };
   });
@@ -3079,6 +3086,139 @@ function populateGroupSelect(elId, selected) {
 }
 
 // ─── ANA SAYFA ───────────────────────────────────────────────────
+// ─── ANALİZ ─────────────────────────────────────────────────────
+function renderAnaliz() {
+  const el = $("analiz-content");
+  if (!el) return;
+
+  const def = parseInt(localStorage.getItem('frames_per_floor') || '10');
+
+  // Toplam çıta hesapla
+  function toplamCita(h) {
+    const frames = h.frames;
+    if (Array.isArray(frames)) return frames.reduce((a,b)=>a+b,0);
+    if (typeof frames === "number") return frames;
+    return def;
+  }
+
+  // Gruplama tanımları
+  const gruplamalar = [
+    {
+      id: "cita",
+      baslik: "🪵 Çıta Sayısına Göre",
+      grupla: h => toplamCita(h) + " Çıta",
+      sirala: (a, b) => parseInt(b) - parseInt(a),
+    },
+    {
+      id: "guc",
+      baslik: "💪 Güce Göre",
+      grupla: h => {
+        const g = h.strength || 5;
+        if (g >= 8) return "💪 Güçlü (8-10)";
+        if (g >= 5) return "👍 Orta (5-7)";
+        return "⚠️ Zayıf (1-4)";
+      },
+      sirala: (a, b) => {
+        const s = {"💪 Güçlü (8-10)":0,"👍 Orta (5-7)":1,"⚠️ Zayıf (1-4)":2};
+        return (s[a]||9) - (s[b]||9);
+      },
+    },
+    {
+      id: "destek",
+      baslik: "🆘 Destek Verilecekler",
+      grupla: h => {
+        const g = h.strength || 5;
+        const c = toplamCita(h);
+        if (g <= 3) return "🔴 Acil Destek (Güç ≤3)";
+        if (g <= 5 && c < def * 0.6) return "🟠 Destek Gerekli";
+        return null; // listeye alma
+      },
+    },
+    {
+      id: "queen",
+      baslik: "👑 Ana Arı Durumuna Göre",
+      grupla: h => h.queen ? `👑 ${h.queen}` : "❓ Belirtilmemiş",
+    },
+    {
+      id: "irk",
+      baslik: "🐝 Irka Göre",
+      grupla: h => h.breed || "❓ Belirtilmemiş",
+    },
+  ];
+
+  function gruplariRender(gruplamaDef) {
+    const aktifHives = hives.filter(h => h.durum !== "satildi" && h.durum !== "söndü");
+    const grupMap = {};
+    aktifHives.forEach(h => {
+      const grup = gruplamaDef.grupla(h);
+      if (grup === null) return;
+      if (!grupMap[grup]) grupMap[grup] = [];
+      grupMap[grup].push(h);
+    });
+
+    let anahtarlar = Object.keys(grupMap);
+    if (gruplamaDef.sirala) anahtarlar.sort(gruplamaDef.sirala);
+
+    if (!anahtarlar.length) return `<div style="font-size:13px;color:var(--gray);text-align:center;padding:16px">Bu kritere göre gösterilecek kovan yok.</div>`;
+
+    return anahtarlar.map(grup => `
+      <div style="margin-bottom:10px">
+        <div style="font-size:12px;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;padding:0 4px">
+          ${grup} <span style="color:var(--gray);font-weight:400">(${grupMap[grup].length} kovan)</span>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          ${grupMap[grup].map(h => `
+            <div onclick="kovanDetayAc('${h.id}')" style="background:${h.color||'var(--amber)'};border-radius:8px;padding:6px 10px;cursor:pointer;display:flex;align-items:center;gap:6px;min-width:52px">
+              <span style="font-size:14px;font-weight:800;color:#fff">${h.name}</span>
+              <span style="font-size:10px;color:rgba(255,255,255,0.85)">${toplamCita(h)}🪵</span>
+            </div>`).join("")}
+        </div>
+      </div>`).join("");
+  }
+
+  let html = `<div style="padding-bottom:80px">`;
+
+  // Filtre butonları
+  html += `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px" id="analiz-filtreler">
+    ${gruplamalar.map(g => `
+      <button onclick="analizFiltreSec('${g.id}')" id="analiz-btn-${g.id}"
+        style="padding:6px 12px;border-radius:20px;border:1.5px solid var(--gray2);background:var(--white);
+        font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--brown2)">
+        ${g.baslik}
+      </button>`).join("")}
+  </div>
+  <div id="analiz-sonuc"></div>`;
+
+  html += `</div>`;
+  el.innerHTML = html;
+
+  // İlk grubu seç
+  analizFiltreSec(gruplamalar[0].id);
+
+  window._analizGruplamalar = gruplamalar;
+  window._analizGruplariRender = gruplariRender;
+}
+
+window.analizFiltreSec = function(id) {
+  const gruplamalar = window._analizGruplamalar;
+  if (!gruplamalar) return;
+  const def = gruplamalar.find(g => g.id === id);
+  if (!def) return;
+
+  // Buton stillerini güncelle
+  gruplamalar.forEach(g => {
+    const btn = $(`analiz-btn-${g.id}`);
+    if (btn) {
+      btn.style.background = g.id === id ? "var(--amber)" : "var(--white)";
+      btn.style.color = g.id === id ? "#fff" : "var(--brown2)";
+      btn.style.borderColor = g.id === id ? "var(--amber)" : "var(--gray2)";
+    }
+  });
+
+  const sonuc = $("analiz-sonuc");
+  if (sonuc) sonuc.innerHTML = window._analizGruplariRender(def);
+};
+
 function renderHome() {
   const el = $("home-content");
   if (!el) return;
@@ -3816,7 +3956,7 @@ function switchTab(key) {
 applyTabOrder(getTabOrder());
 activeTab = "home";
 document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === "home"));
-["tab-home","tab-hives","tab-schedule","tab-records","tab-gecmis","tab-gelir","tab-kroki","tab-settings"].forEach(id => {
+["tab-home","tab-hives","tab-schedule","tab-records","tab-gecmis","tab-gelir","tab-analiz","tab-kroki","tab-settings"].forEach(id => {
   const el = $(id); if(el) el.style.display = id === "tab-home" ? "" : "none";
 });
 updateFabVisibility();
