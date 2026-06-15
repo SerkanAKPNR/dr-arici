@@ -933,7 +933,11 @@ $("btn-register").onclick = async () => {
   } catch(err) { showAuthError(err.code); }
 };
 $("btn-logout").onclick = () => {
-  [_unsubAyarlar,_unsubGelir,_unsubHives,_unsubSchedules,_unsubRecords,_unsubGecmis].forEach(u=>u&&u());
+  [_unsubAyarlar,_unsubGelir,_unsubHives,_unsubSchedules,_unsubRecords,_unsubGecmis,window._unsubHatir].forEach(u=>u&&u());
+  signOut(auth);
+};
+window.cikisYap = function() {
+  [_unsubAyarlar,_unsubGelir,_unsubHives,_unsubSchedules,_unsubRecords,_unsubGecmis,window._unsubHatir].forEach(u=>u&&u());
   signOut(auth);
 };
 
@@ -967,22 +971,25 @@ onAuthStateChanged(auth, async (user) => {
       }
       showIsletmeSecim(isletmeler);
     } else {
-      // Normal kullanıcı — direkt kendi işletmesine gir
+      // Normal kullanıcı — askıda mı kontrol et
+      try {
+        const adminSnap = await getDocs(collection(db, "admin_isletmeler"));
+        const mevcutDoc = adminSnap.docs.find(d => d.id === user.uid);
+        if (mevcutDoc?.data()?.askida === true) {
+          await signOut(auth);
+          $("auth-error").textContent = "⏸️ Hesabınız askıya alınmıştır. Lütfen yönetici ile iletişime geçin.";
+          $("auth-error").style.display = "block";
+          return;
+        }
+        if (!mevcutDoc) {
+          const ayarSnap = await getDocs(collection(db, `users/${user.uid}/ayarlar`));
+          const isletmeAd = ayarSnap.docs[0]?.data()?.isletmeAd || user.email;
+          await setDoc(doc(db, "admin_isletmeler", user.uid), { ad: isletmeAd, email: user.email, sahipUid: user.uid });
+        }
+      } catch(e) {}
       activeIsletmeId = user.uid;
       $("auth-screen").style.display = "none";
       $("app").style.display = "block";
-      const ayarSnap = await getDocs(collection(db, `users/${user.uid}/ayarlar`));
-      // admin_isletmeler'e yoksa ekle (admin görebilsin)
-      try {
-        const mevcutSnap = await getDocs(collection(db, "admin_isletmeler"));
-        const mevcut = mevcutSnap.docs.find(d => d.id === user.uid);
-        if (!mevcut) {
-          const isletmeAd = ayarSnap.docs[0]?.data()?.isletmeAd || user.email;
-          await setDoc(doc(db, "admin_isletmeler", user.uid), {
-            ad: isletmeAd, email: user.email, sahipUid: user.uid
-          });
-        }
-      } catch(e) {}
       loadAll();
     }
   } else {
@@ -1012,20 +1019,38 @@ function showIsletmeSecim(isletmeler) {
   screen.style.display = "flex";
   $("app").style.display = "none";
   screen.innerHTML = `
-    <div class="auth-card">
+    <div class="auth-card" style="max-width:460px">
       <div class="auth-logo">🐝</div>
       <h1 class="auth-title">Dr. Arıcı</h1>
       <p class="auth-sub">İşletme Seç</p>
       <div style="display:flex;flex-direction:column;gap:8px;width:100%;margin-bottom:12px">
-        ${isletmeler.map(i => `
-          <div style="display:flex;gap:8px">
-            <button onclick="isletmeyeGir('${i.uid}','${i.ad}')"
-              style="flex:1;background:var(--white);border:1.5px solid var(--gray2);border-radius:12px;padding:14px;text-align:left;cursor:pointer;transition:border-color .2s"
-              onmouseover="this.style.borderColor='var(--amber)'" onmouseout="this.style.borderColor='var(--gray2)'">
-              <div style="font-weight:700;font-size:15px;color:var(--brown)">🏡 ${i.ad}</div>
-              <div style="font-size:12px;color:var(--gray);margin-top:2px">${i.email||''}</div>
+        ${isletmeler.map(i => {
+          const askida = i.askida === true;
+          return `
+          <div style="display:flex;gap:6px;align-items:center">
+            <button onclick="isletmeyeGir('${i.uid}','${i.ad}')" ${askida ? 'disabled' : ''}
+              style="flex:1;background:${askida?'#F3F4F6':'var(--white)'};border:1.5px solid ${askida?'#E5E7EB':'var(--gray2)'};border-radius:12px;padding:12px;text-align:left;cursor:${askida?'not-allowed':'pointer'};transition:border-color .2s"
+              ${askida?'':'onmouseover="this.style.borderColor=\'var(--amber)\'" onmouseout="this.style.borderColor=\'var(--gray2)\'"'}>
+              <div style="font-weight:700;font-size:14px;color:${askida?'var(--gray)':'var(--brown)'}">
+                ${askida?'⏸️':'🏡'} ${i.ad} ${askida?'<span style="font-size:11px;color:#EF4444">(Askıda)</span>':''}
+              </div>
+              <div style="font-size:11px;color:var(--gray);margin-top:1px">${i.email||''}</div>
             </button>
-          </div>`).join("")}
+            ${i.uid !== currentUser.uid ? `
+            <div style="display:flex;flex-direction:column;gap:3px">
+              <button onclick="isletmeAskiToggle('${i.uid}',${!askida})"
+                title="${askida?'Aktif Et':'Askıya Al'}"
+                style="width:32px;height:32px;border:1.5px solid ${askida?'#22C55E':'var(--amber)'};border-radius:8px;background:var(--white);cursor:pointer;font-size:14px">
+                ${askida?'▶️':'⏸️'}
+              </button>
+              <button onclick="isletmeSilAdmin('${i.uid}','${i.ad}')"
+                title="Sil"
+                style="width:32px;height:32px;border:1.5px solid #FCA5A5;border-radius:8px;background:var(--white);cursor:pointer;font-size:14px">
+                🗑️
+              </button>
+            </div>` : ''}
+          </div>`;
+        }).join("")}
       </div>
       <button onclick="yeniIsletmeEkle()"
         style="width:100%;padding:11px;border:1.5px dashed var(--gray2);border-radius:10px;background:none;color:var(--gray);cursor:pointer;font-size:14px;font-family:inherit;margin-bottom:8px">
@@ -1034,6 +1059,29 @@ function showIsletmeSecim(isletmeler) {
       <button onclick="window.cikisYap()" style="background:none;border:none;color:var(--gray);cursor:pointer;font-size:13px;font-family:inherit">🚪 Çıkış Yap</button>
     </div>`;
 }
+
+window.isletmeAskiToggle = async function(uid, askida) {
+  await setDoc(doc(db, "admin_isletmeler", uid), { askida }, { merge: true });
+  showToast(askida ? "⏸️ Askıya alındı" : "✅ Aktif edildi");
+  const isletmeler = await getIsletmeler();
+  showIsletmeSecim(isletmeler);
+};
+
+window.isletmeSilAdmin = async function(uid, ad) {
+  if (!confirm(`"${ad}" işletmesi ve tüm verileri silinsin mi?\nBu işlem geri alınamaz!`)) return;
+  showToast("Siliniyor...");
+  const koleksiyonlar = ["kovanllar","takvim","kayitlar","kovan_gecmis","hatirlatmalar","gelir_gider","ayarlar"];
+  for (const k of koleksiyonlar) {
+    try {
+      const snap = await getDocs(collection(db, `users/${uid}/${k}`));
+      for (const d of snap.docs) await deleteDoc(d.ref);
+    } catch(e) {}
+  }
+  await deleteDoc(doc(db, "admin_isletmeler", uid));
+  showToast("✓ İşletme silindi");
+  const isletmeler = await getIsletmeler();
+  showIsletmeSecim(isletmeler);
+};
 
 window.isletmeyeGir = async function(uid, ad) {
   activeIsletmeId = uid;
@@ -4339,10 +4387,6 @@ async function kovanTasiKaydet() {
 window.kovanTasiKaydet = kovanTasiKaydet;
 
 window.kovanTasi = kovanTasi;
-window.cikisYap = function() {
-  [_unsubAyarlar,_unsubGelir,_unsubHives,_unsubSchedules,_unsubRecords,_unsubGecmis,window._unsubHatir].forEach(u=>u&&u());
-  signOut(auth);
-};
 
 window.verileriSilOnay = function() {
   $("sifre-modal-baslik").textContent = "🗑️ Verileri Sil";
