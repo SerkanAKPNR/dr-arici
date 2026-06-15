@@ -899,38 +899,31 @@ function openModal(id) { $(id).classList.add("open"); }
 function closeModal(id) { $(id).classList.remove("open"); }
 
 // ─── AUTH ────────────────────────────────────────────────────────
+let _kayitModu = false;
+
+function setKayitModu(aktif) {
+  _kayitModu = aktif;
+  $("auth-isletme").style.display = aktif ? "" : "none";
+  $("btn-register").textContent = aktif ? "✅ Kaydol" : "Hesap oluştur";
+  $("btn-login").textContent = aktif ? "← Geri" : "Giriş Yap";
+}
+
 $("btn-login").onclick = async () => {
-  $("auth-isletme").style.display = "none";
+  if (_kayitModu) { setKayitModu(false); return; }
   const e = $("auth-email").value.trim(), p = $("auth-pass").value;
+  if (!e || !p) { showAuthError("auth/invalid-email"); return; }
   try {
     await signInWithEmailAndPassword(auth, e, p);
-  } catch(err) {
-    showAuthError(err.code);
-  }
+  } catch(err) { showAuthError(err.code); }
 };
 
-let _kayitModu = false;
 $("btn-register").onclick = async () => {
-  if (!_kayitModu) {
-    // İlk tık: işletme adı alanını göster, butonu "Kaydol" yap
-    _kayitModu = true;
-    $("auth-isletme").style.display = "";
-    $("auth-isletme").focus();
-    $("btn-register").textContent = "Kaydol";
-    $("btn-login").textContent = "← Giriş Yap";
-    $("btn-login").onclick = () => {
-      _kayitModu = false;
-      $("auth-isletme").style.display = "none";
-      $("btn-register").textContent = "Hesap oluştur";
-      $("btn-login").textContent = "Giriş Yap";
-      $("btn-login").onclick = loginHandler;
-    };
-    return;
-  }
+  if (!_kayitModu) { setKayitModu(true); $("auth-isletme").focus(); return; }
   const e = $("auth-email").value.trim();
   const p = $("auth-pass").value;
   const isletmeAd = $("auth-isletme").value.trim();
   if (!isletmeAd) { showAuthError("isletme-bos"); return; }
+  if (!e) { showAuthError("auth/invalid-email"); return; }
   if (p.length < 6) { showAuthError("weak-password"); return; }
   try {
     const cred = await createUserWithEmailAndPassword(auth, e, p);
@@ -939,12 +932,6 @@ $("btn-register").onclick = async () => {
     await setDoc(doc(db, "admin_isletmeler", uid), { ad: isletmeAd, email: e, sahipUid: uid });
   } catch(err) { showAuthError(err.code); }
 };
-
-function loginHandler() {
-  $("auth-isletme").style.display = "none";
-  const e = $("auth-email").value.trim(), p = $("auth-pass").value;
-  signInWithEmailAndPassword(auth, e, p).catch(err => showAuthError(err.code));
-}
 $("btn-logout").onclick = () => {
   [_unsubAyarlar,_unsubGelir,_unsubHives,_unsubSchedules,_unsubRecords,_unsubGecmis].forEach(u=>u&&u());
   signOut(auth);
