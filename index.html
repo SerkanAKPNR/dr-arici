@@ -1177,15 +1177,17 @@ function loadAyarlar() {
     if (snap.exists()) {
       const d = snap.data();
       if (d.gruplar) localStorage.setItem("arilık_gruplar", JSON.stringify(d.gruplar));
+      if (d.kaliplar) localStorage.setItem("not_kaliplari", JSON.stringify(d.kaliplar));
       if (d.tipler) localStorage.setItem("kovan_tipleri", JSON.stringify(d.tipler));
       if (d.bannedNumbers) localStorage.setItem("banned_hive_numbers", JSON.stringify(d.bannedNumbers));
       if (d.framesPerFloor) localStorage.setItem("frames_per_floor", String(d.framesPerFloor));
     }
     // Render
     if (document.getElementById("grup-listesi")) renderGrupListesi();
-  if (document.getElementById("kalip-listesi")) renderKalipListesi();
+    if (document.getElementById("kalip-listesi")) renderKalipListesi();
     if (document.getElementById("tip-listesi")) renderTipListesi();
     populateHiveTypeSelect();
+    if (activeTab === "analiz") renderAnaliz();
   });
 }
 
@@ -3206,6 +3208,15 @@ function renderAnaliz() {
       baslik: "🐝 Irka Göre",
       grupla: h => h.breed || "❓ Belirtilmemiş",
     },
+    // Kalıp bazlı gruplamalar
+    ...getKaliplar().map(k => ({
+      id: `kalip_${k.id}`,
+      baslik: `${k.ikon} ${k.ad}`,
+      grupla: h => {
+        const aktifNot = (h.notlar||[]).find(n => n.kalip === k.id && !n.tamamlandi);
+        return aktifNot ? `${k.ikon} ${k.ad}` : null;
+      },
+    })),
   ];
 
   function gruplariRender(gruplamaDef) {
