@@ -1790,11 +1790,11 @@ $("hive-save").onclick = async () => {
     group: $("hive-group").value || null,
     originHiveId: $("hive-origin").value || null,
     qpos: window._queenPos || null,
+    pos: window._queenPos ? null : selectedPos,
     type: $("hive-type").value,
     breed: $("hive-breed").value.trim(),
     queen: $("hive-queen").value,
     strength: Number($("hive-strength").value),
-    pos: selectedPos,
     floors: Number($("hive-floors").value||1),
     frames: getKatCitaValues(),
     color: selectedColor,
@@ -4543,7 +4543,7 @@ window.queenSecimKaldir = function() {
 window.queenTasiKaydet = async function() {
   const yeniPoz = queenPendingPos[queenSeciliHiveId];
   if (!yeniPoz) { queenSecimKaldir(); return; }
-  await updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${queenSeciliHiveId}`), { qpos: yeniPoz });
+  await updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${queenSeciliHiveId}`), { qpos: yeniPoz, pos: null });
   showToast("✓ Kraliçe kutusu konumu güncellendi");
   queenPendingPos = {}; queenOriginalPos = {};
   queenSeciliHiveId = null;
