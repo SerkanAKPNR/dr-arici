@@ -513,9 +513,9 @@
       <div class="sec-title">Hesap</div>
       <div style="background:var(--white);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow)">
         <div style="font-size:13px;color:var(--gray);margin-bottom:12px" id="settings-email">—</div>
-        <button id="btn-cikis-yap" onclick="window.cikisYap()" style="width:100%;padding:11px;border:1.5px solid var(--gray2);border-radius:10px;background:var(--white);cursor:pointer;font-size:14px;color:var(--brown2);font-family:inherit;margin-bottom:8px">🚪 Çıkış Yap</button>
-        <button id="btn-veri-sil" onclick="window.verileriSilOnay()" style="width:100%;padding:11px;border:1.5px solid #FCA5A5;border-radius:10px;background:var(--white);cursor:pointer;font-size:14px;color:#EF4444;font-family:inherit;margin-bottom:8px">🗑️ Tüm Verileri Sil</button>
-        <button id="btn-hesap-sil" onclick="window.hesabiSilOnay()" style="width:100%;padding:11px;border-radius:10px;background:#EF4444;color:#fff;border:none;cursor:pointer;font-size:14px;font-family:inherit;font-weight:700">❌ Hesabı Sil</button>
+        <button id="btn-cikis-yap" style="width:100%;padding:11px;border:1.5px solid var(--gray2);border-radius:10px;background:var(--white);cursor:pointer;font-size:14px;color:var(--brown2);font-family:inherit;margin-bottom:8px">🚪 Çıkış Yap</button>
+        <button id="btn-veri-sil" style="width:100%;padding:11px;border:1.5px solid #FCA5A5;border-radius:10px;background:var(--white);cursor:pointer;font-size:14px;color:#EF4444;font-family:inherit;margin-bottom:8px">🗑️ Tüm Verileri Sil</button>
+        <button id="btn-hesap-sil" style="width:100%;padding:11px;border-radius:10px;background:#EF4444;color:#fff;border:none;cursor:pointer;font-size:14px;font-family:inherit;font-weight:700">❌ Hesabı Sil</button>
       </div>
     </div>
   </div>
@@ -1789,7 +1789,7 @@ $("hive-save").onclick = async () => {
     name,
     group: $("hive-group").value || null,
     originHiveId: $("hive-origin").value || null,
-    qpos: (window._queenPos && !selectedPos) ? window._queenPos : null,
+    qpos: window._queenPos || null,
     type: $("hive-type").value,
     breed: $("hive-breed").value.trim(),
     queen: $("hive-queen").value,
@@ -2064,7 +2064,10 @@ function renderSettings() {
   const qcolsEl = $("set-qcols"); if (qcolsEl) qcolsEl.value = QCOLS;
   // Butonları her seferinde yeniden bağla
   const btnCikis = $("btn-cikis-yap");
-  if (btnCikis) btnCikis.onclick = window.cikisYap;
+  if (btnCikis) btnCikis.onclick = () => {
+    [_unsubAyarlar,_unsubGelir,_unsubHives,_unsubSchedules,_unsubRecords,_unsubGecmis,window._unsubHatir].forEach(u=>u&&u());
+    signOut(auth);
+  };
   const btnVeri = $("btn-veri-sil");
   if (btnVeri) btnVeri.onclick = window.verileriSilOnay;
   const btnHesap = $("btn-hesap-sil");
