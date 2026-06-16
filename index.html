@@ -3167,7 +3167,7 @@ function renderAnaliz() {
   const gruplamalar = [
     {
       id: "cita",
-      baslik: "🪵 Çıta Sayısına Göre",
+      baslik: "🍯 Çıta Sayısına Göre",
       grupla: h => toplamCita(h) + " Çıta",
       sirala: (a, b) => parseInt(b) - parseInt(a),
     },
@@ -3232,7 +3232,7 @@ function renderAnaliz() {
           ${grupMap[grup].map(h => `
             <div onclick="kovanDetayAc('${h.id}')" style="background:${h.color||'var(--amber)'};border-radius:8px;padding:6px 10px;cursor:pointer;display:flex;align-items:center;gap:6px;min-width:52px">
               <span style="font-size:14px;font-weight:800;color:#fff">${h.name}</span>
-              <span style="font-size:10px;color:rgba(255,255,255,0.85)">${toplamCita(h)}🪵</span>
+              <span style="font-size:10px;color:rgba(255,255,255,0.85)">${toplamCita(h)}🍯</span>
             </div>`).join("")}
         </div>
       </div>`).join("");
