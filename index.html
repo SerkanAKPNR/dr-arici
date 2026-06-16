@@ -3341,24 +3341,25 @@ function renderHome() {
   if (aktifHatir.length) {
     html += `<div style="background:var(--white);border-radius:var(--radius);padding:16px;margin-bottom:10px;box-shadow:var(--shadow)">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <span style="font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:var(--brown)">🔔 Hatırlatmalar</span>
+        <span style="font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:var(--brown)">🔔 Hatırlatmalar (${aktifHatir.length})</span>
         <button onclick="hatirlatmaEkleAc()" style="background:var(--amber);color:#fff;border:none;border-radius:8px;padding:4px 10px;font-size:12px;cursor:pointer;font-family:inherit;font-weight:700">+ Ekle</button>
       </div>
-      ${aktifHatir.slice(0,5).map(h => {
+      <div style="max-height:260px;overflow-y:auto">
+      ${aktifHatir.map(h => {
         const tarih = new Date(h.bitisT + 'T00:00:00');
         const gecti = tarih < bugun;
         const bugunMu = tarih.getTime() === bugun.getTime();
         return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--gray2)">
-          <div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:${gecti?'var(--red)':bugunMu?'var(--amber)':'#3B82F6'}"></div>
+          <div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:${gecti?'#EF4444':bugunMu?'var(--amber)':'#3B82F6'}"></div>
           <div style="flex:1">
             <div style="font-size:13px;color:var(--brown)">${h.metin}</div>
-            <div style="font-size:11px;color:${gecti?'var(--red)':'var(--gray)'}">${gecti?'⚠️ Gecikmiş · ':bugunMu?'📅 Bugün · ':''}${tarih.toLocaleDateString('tr-TR',{day:'numeric',month:'short'})}</div>
+            <div style="font-size:11px;color:${gecti?'#EF4444':'var(--gray)'}">${gecti?'⚠️ Gecikmiş · ':bugunMu?'📅 Bugün · ':''}${tarih.toLocaleDateString('tr-TR',{day:'numeric',month:'short'})}</div>
           </div>
-          <button onclick="hatirlatmaTamamla('${h.id}')" style="background:none;border:none;color:#22C55E;cursor:pointer;font-size:18px">✅</button>
+          <button onclick="hatirlatmaTamamlaOnay('${h.id}')" style="background:none;border:none;color:#22C55E;cursor:pointer;font-size:18px">✅</button>
           <button onclick="hatirlatmaErtele('${h.id}')" style="background:none;border:none;color:var(--amber);cursor:pointer;font-size:16px">⏰</button>
         </div>`;
       }).join('')}
-      ${aktifHatir.length > 5 ? `<div style="font-size:12px;color:var(--gray);text-align:center;margin-top:6px">${aktifHatir.length-5} hatırlatma daha...</div>` : ''}
+      </div>
     </div>`;
   } else {
     html += `<button onclick="hatirlatmaEkleAc()" style="width:100%;padding:12px;background:var(--white);color:var(--amber);border:1.5px dashed var(--amber);border-radius:var(--radius);font-size:14px;cursor:pointer;font-family:inherit;font-weight:600;margin-bottom:10px">🔔 Hatırlatma Ekle</button>`;
@@ -3399,10 +3400,13 @@ window.hatirlatmaKaydet = async function() {
   closeModal("modal-hatirlatma");
 };
 
-window.hatirlatmaTamamla = async function(id) {
+window.hatirlatmaTamamlaOnay = async function(id) {
+  if (!confirm("Bu hatırlatma tamamlandı olarak işaretlensin mi?")) return;
   await updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/hatirlatmalar/${id}`), { tamamlandi: true });
   showToast("✅ Tamamlandı!");
 };
+
+window.hatirlatmaTamamla = window.hatirlatmaTamamlaOnay;
 
 window.hatirlatmaErtele = async function(id) {
   const gun = prompt("Kaç gün erteleyelim?", "3");
