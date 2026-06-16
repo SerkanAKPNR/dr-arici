@@ -2803,7 +2803,7 @@ async function hiveNotKaydet() {
   } else if (notEklenenKaynak === 'notlarModal') {
     setTimeout(() => notlarModalAc(notEklenenHiveId), 300);
   } else if (notEklenenKaynak === 'detayTam') {
-    setTimeout(() => renderKovanDetayTam(), 300);
+    setTimeout(() => { renderKovanDetayTam(); openModal('modal-kovan-detay-tam'); }, 300);
   }
   notEklenenKaynak = null;
   notDuzenlemeIdx = null;
