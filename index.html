@@ -1206,7 +1206,7 @@ async function saveAyarlarToFirestore() {
 }
 
 // Dinleyici referansları
-let _unsubHives = null, _unsubSchedules = null, _unsubRecords = null, _unsubGecmis = null;
+let _unsubHives = null, _unsubSchedules = null, _unsubRecords = null, _unsubGecmis = null, _unsubGelir = null;
 
 function loadHives() {
   if (_unsubHives) _unsubHives();
@@ -2539,7 +2539,7 @@ function renderKovanDetayTam() {
 
     <!-- Butonlar -->
     <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button onclick="closeModal('modal-kovan-detay-tam');notEkleAc('${hive.id}')"
+      <button onclick="closeModal('modal-kovan-detay-tam');notEkleAcDetayTam('${hive.id}')"
         style="flex:1;padding:10px;border:1.5px solid var(--amber);border-radius:10px;background:var(--white);color:var(--amber);cursor:pointer;font-size:13px;font-weight:700;font-family:inherit;min-width:80px">📝 Not</button>
       <button onclick="closeModal('modal-kovan-detay-tam');editHive('${hive.id}')"
         style="flex:1;padding:10px;border:1.5px solid var(--gray2);border-radius:10px;background:var(--white);cursor:pointer;font-size:13px;font-family:inherit;min-width:80px">✏️ Düzenle</button>
@@ -2744,7 +2744,25 @@ function notEkleAcKroki(hiveId) {
 }
 window.notEkleAcKroki = notEkleAcKroki;
 
-function notEkleAcNotlarModal(hiveId) {
+function notEkleAcDetayTam(hiveId) {
+  notEklenenHiveId = hiveId;
+  notEklenenKaynak = 'detayTam';
+  notDuzenlemeIdx = null;
+  $("hive-not-modal-baslik").textContent = "📝 Not Ekle";
+  $("hive-not-kaydet-btn").textContent = "Kaydet";
+  $("hive-not-text").value = "";
+  seciliKalipId = null;
+  const el = $("kalip-secici");
+  if (el) {
+    el.innerHTML = getKaliplar().map(k =>
+      `<button onclick="kalipSec('${k.id}')" id="kalip-btn-${k.id}"
+        style="padding:5px 10px;border:1.5px solid var(--gray2);border-radius:20px;background:var(--white);
+        cursor:pointer;font-size:12px;font-family:inherit;color:var(--brown2)">${k.ikon} ${k.ad}</button>`
+    ).join("");
+  }
+  openModal("modal-hive-not");
+}
+window.notEkleAcDetayTam = notEkleAcDetayTam;
   notEklenenHiveId = hiveId;
   notEklenenKaynak = 'notlarModal';
   $("hive-not-text").value = "";
@@ -4002,6 +4020,12 @@ function switchTab(key) {
 
 // Başlangıçta kayıtlı sekme sırası uygula
 applyTabOrder(getTabOrder());
+// Çıkış butonunu direkt bağla
+const _bc = $("btn-cikis-yap");
+if (_bc) _bc.onclick = () => {
+  [_unsubAyarlar,_unsubGelir,_unsubHives,_unsubSchedules,_unsubRecords,_unsubGecmis,window._unsubHatir].forEach(u=>u&&u());
+  signOut(auth);
+};
 activeTab = "home";
 document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === "home"));
 ["tab-home","tab-hives","tab-schedule","tab-records","tab-gecmis","tab-gelir","tab-analiz","tab-kroki","tab-settings"].forEach(id => {
