@@ -1413,23 +1413,17 @@ window.deleteHive = async function(id, durum, not) {
   if (!hive) return;
   const num = parseInt(hive.name);
 
-  if (durum === "silindi") {
-    // Kalıcı sil: geçmişe gitme, numara serbest kalsın
-    await deleteDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${id}`));
-    showToast("Kovan kalıcı silindi ✓");
-  } else {
-    // Satıldı / Söndü: geçmişe taşı, numarayı yasakla
-    if (num > 0) addBannedNumber(num);
-    await addDoc(col("kovan_gecmis"), {
-      ...hive,
-      arsivDurum: durum,
-      arsivNot: not || "",
-      arsivTarih: new Date().toISOString().split("T")[0],
-      arsivAt: serverTimestamp(),
-    });
-    await deleteDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${id}`));
-    showToast(durum === "satildi" ? "Kovan satıldı ✓" : "Kovan söndü olarak işaretlendi");
-  }
+  // Hepsi geçmişe taşınır, numara serbest kalır (silindi hariç — o yasaklanır)
+  if (durum !== "silindi" && num > 0) addBannedNumber(num);
+  await addDoc(col("kovan_gecmis"), {
+    ...hive,
+    arsivDurum: durum,
+    arsivNot: not || "",
+    arsivTarih: new Date().toISOString().split("T")[0],
+    arsivAt: serverTimestamp(),
+  });
+  await deleteDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${id}`));
+  showToast(durum === "satildi" ? "Kovan satıldı ✓" : durum === "söndü" ? "Kovan söndü olarak işaretlendi" : "Kovan silindi, geçmişte saklanıyor ✓");
   loadAll();
 };
 
@@ -2695,6 +2689,7 @@ function renderHiveNotes(h) {
   }
   const sonNot = notlar[0];
   const sonKalip = sonNot.kalip ? getKaliplar().find(k => k.id === sonNot.kalip) : null;
+  const gorevAktif = sonKalip && !sonNot.tamamlandi;
   return `<div style="margin-top:8px;border-top:1px dashed var(--gray2);padding-top:8px">
     ${sonKalip ? `<div style="display:inline-flex;align-items:center;gap:3px;background:var(--amber4);color:var(--amber);border-radius:20px;padding:2px 8px;font-size:11px;font-weight:600;margin-bottom:4px">${sonKalip.ikon} ${sonKalip.ad}${sonNot.bitisT ? ` · ${new Date(sonNot.bitisT).toLocaleDateString("tr-TR",{day:"numeric",month:"short"})}` : ''}</div>` : ''}
     <div style="display:flex;gap:8px;align-items:flex-start">
@@ -2702,12 +2697,44 @@ function renderHiveNotes(h) {
         <div style="font-size:11px;color:var(--amber);font-weight:600;margin-bottom:2px">${sonNot.tarih} ${notlar.length > 1 ? `<span style="color:var(--gray)">(+${notlar.length-1} not daha)</span>` : ''}</div>
         <div style="font-size:13px;color:var(--brown2);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${sonNot.metin}${sonNot.bitisT && !sonNot.tamamlandi ? ` <span style="font-size:11px;color:var(--amber)">(${new Date(sonNot.bitisT).toLocaleDateString('tr-TR',{day:'numeric',month:'short'})})</span>` : ''}</div>
       </div>
-      <button onclick="notEkleAc('${h.id}')" style="font-size:12px;color:var(--amber);background:none;border:1px dashed var(--amber);border-radius:8px;padding:4px 8px;cursor:pointer;font-family:inherit;flex-shrink:0">+</button>
+      ${!gorevAktif ? `<button onclick="notEkleAc('${h.id}')" style="font-size:12px;color:var(--amber);background:none;border:1px dashed var(--amber);border-radius:8px;padding:4px 8px;cursor:pointer;font-family:inherit;flex-shrink:0">+</button>` : ''}
     </div>
+    ${gorevAktif ? `<div style="display:flex;gap:6px;margin-top:6px">
+      <button onclick="event.stopPropagation();kartNotTamamla('${h.id}',${h.notlar.length-1})"
+        style="flex:1;padding:5px;background:#22C55E;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit;font-weight:600">✅ Tamamlandı</button>
+      <button onclick="event.stopPropagation();kartNotErtele('${h.id}',${h.notlar.length-1})"
+        style="flex:1;padding:5px;background:var(--amber);color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit;font-weight:600">⏰ Ertele</button>
+    </div>` : ''}
   </div>`;
 }
 
 let seciliKalipId = null;
+
+window.kartNotTamamla = async function(hiveId, idx) {
+  const hive = hives.find(h => h.id === hiveId);
+  if (!hive) return;
+  const notlar = [...(hive.notlar || [])];
+  notlar[idx] = { ...notlar[idx], tamamlandi: true };
+  await updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${hiveId}`), { notlar });
+  hive.notlar = notlar;
+  showToast("✅ Tamamlandı!");
+  renderHives();
+};
+
+window.kartNotErtele = async function(hiveId, idx) {
+  const gun = prompt("Kaç gün erteleyelim?", "7");
+  if (!gun || isNaN(gun)) return;
+  const hive = hives.find(h => h.id === hiveId);
+  if (!hive) return;
+  const notlar = [...(hive.notlar || [])];
+  const yeniT = new Date();
+  yeniT.setDate(yeniT.getDate() + parseInt(gun));
+  notlar[idx] = { ...notlar[idx], bitisT: yeniT.toISOString().split("T")[0] };
+  await updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${hiveId}`), { notlar });
+  hive.notlar = notlar;
+  showToast(`⏰ ${gun} gün ertelendi`);
+  renderHives();
+};
 
 function notEkleAc(hiveId) {
   notEklenenHiveId = hiveId;
@@ -2877,15 +2904,7 @@ let kovanGecmis = [];
 function loadKovanGecmis() {
   if (_unsubGecmis) _unsubGecmis();
   _unsubGecmis = onSnapshot(query(col("kovan_gecmis"), orderBy("arsivAt", "desc")), snap => {
-    // Yanlışlıkla geçmişe girmiş "silindi" kayıtlarını temizle
-    snap.docs.forEach(d => {
-      if (d.data().arsivDurum === "silindi") {
-        deleteDoc(doc(db, `users/${currentUser.uid}/kovan_gecmis/${d.id}`));
-      }
-    });
-    kovanGecmis = snap.docs
-      .map(d => ({ id: d.id, ...d.data() }))
-      .filter(k => k.arsivDurum !== "silindi");
+    kovanGecmis = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderGecmis();
   });
 }
