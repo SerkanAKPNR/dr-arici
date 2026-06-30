@@ -513,9 +513,9 @@
       <div class="sec-title">Hesap</div>
       <div style="background:var(--white);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow)">
         <div style="font-size:13px;color:var(--gray);margin-bottom:12px" id="settings-email">—</div>
-        <button id="btn-cikis-yap" style="width:100%;padding:11px;border:1.5px solid var(--gray2);border-radius:10px;background:var(--white);cursor:pointer;font-size:14px;color:var(--brown2);font-family:inherit;margin-bottom:8px">🚪 Çıkış Yap</button>
-        <button id="btn-veri-sil" style="width:100%;padding:11px;border:1.5px solid #FCA5A5;border-radius:10px;background:var(--white);cursor:pointer;font-size:14px;color:#EF4444;font-family:inherit;margin-bottom:8px">🗑️ Tüm Verileri Sil</button>
-        <button id="btn-hesap-sil" style="width:100%;padding:11px;border-radius:10px;background:#EF4444;color:#fff;border:none;cursor:pointer;font-size:14px;font-family:inherit;font-weight:700">❌ Hesabı Sil</button>
+        <button id="btn-cikis-yap" onclick="window.cikisYap()" style="width:100%;padding:11px;border:1.5px solid var(--gray2);border-radius:10px;background:var(--white);cursor:pointer;font-size:14px;color:var(--brown2);font-family:inherit;margin-bottom:8px">🚪 Çıkış Yap</button>
+        <button id="btn-veri-sil" onclick="window.verileriSilOnay()" style="width:100%;padding:11px;border:1.5px solid #FCA5A5;border-radius:10px;background:var(--white);cursor:pointer;font-size:14px;color:#EF4444;font-family:inherit;margin-bottom:8px">🗑️ Tüm Verileri Sil</button>
+        <button id="btn-hesap-sil" onclick="window.hesabiSilOnay()" style="width:100%;padding:11px;border-radius:10px;background:#EF4444;color:#fff;border:none;cursor:pointer;font-size:14px;font-family:inherit;font-weight:700">❌ Hesabı Sil</button>
       </div>
     </div>
   </div>
@@ -752,7 +752,7 @@
   </div>
 </div>
 <!-- MODAL: Kovan Detay -->
-<div class="modal-overlay" id="modal-kovan-detay-tam">
+<div class="modal-overlay" id="modal-kovan-detay-tam" style="z-index:45">
   <div class="modal" style="display:flex;flex-direction:column;height:88vh;max-height:88vh;padding-bottom:0">
     <div class="modal-handle" style="flex-shrink:0"></div>
     <!-- Başlık — kapat butonu -->
@@ -1002,21 +1002,15 @@ onAuthStateChanged(auth, async (user) => {
 async function getIsletmeler() {
   const isletmeler = [];
   try {
+    // Admin tüm users/ altındaki ayarlar/genel'i okur
+    // Basit çözüm: bilinen UID'leri Firestore'da sakla
     const adminDoc = await getDocs(collection(db, "admin_isletmeler"));
     adminDoc.forEach(d => isletmeler.push({ uid: d.id, ...d.data() }));
     // Kendi uid'ini de ekle
     if (!isletmeler.find(i => i.uid === currentUser.uid)) {
-      isletmeler.push({ uid: currentUser.uid, ad: "Ana Arılık", email: currentUser.email });
+      isletmeler.push({ uid: currentUser.uid, ad: "Ana Arılık" });
     }
-    // Eski verilerin bulunduğu UID'i ekle (geçiş için)
-    const eskiUid = "a49Jsp3MbcSjjaz9rDgGNEVi9kt2";
-    if (!isletmeler.find(i => i.uid === eskiUid)) {
-      isletmeler.unshift({ uid: eskiUid, ad: "Ana Arılık (Veriler)", email: currentUser.email });
-    }
-  } catch(e) {
-    isletmeler.push({ uid: currentUser.uid, ad: "Ana Arılık", email: currentUser.email });
-    isletmeler.unshift({ uid: "a49Jsp3MbcSjjaz9rDgGNEVi9kt2", ad: "Ana Arılık (Veriler)", email: currentUser.email });
-  }
+  } catch(e) { isletmeler.push({ uid: currentUser.uid, ad: "Ana Arılık" }); }
   return isletmeler;
 }
 
@@ -1177,17 +1171,15 @@ function loadAyarlar() {
     if (snap.exists()) {
       const d = snap.data();
       if (d.gruplar) localStorage.setItem("arilık_gruplar", JSON.stringify(d.gruplar));
-      if (d.kaliplar) localStorage.setItem("not_kaliplari", JSON.stringify(d.kaliplar));
       if (d.tipler) localStorage.setItem("kovan_tipleri", JSON.stringify(d.tipler));
       if (d.bannedNumbers) localStorage.setItem("banned_hive_numbers", JSON.stringify(d.bannedNumbers));
       if (d.framesPerFloor) localStorage.setItem("frames_per_floor", String(d.framesPerFloor));
     }
     // Render
     if (document.getElementById("grup-listesi")) renderGrupListesi();
-    if (document.getElementById("kalip-listesi")) renderKalipListesi();
+  if (document.getElementById("kalip-listesi")) renderKalipListesi();
     if (document.getElementById("tip-listesi")) renderTipListesi();
     populateHiveTypeSelect();
-    if (activeTab === "analiz") renderAnaliz();
   });
 }
 
@@ -1208,7 +1200,7 @@ async function saveAyarlarToFirestore() {
 }
 
 // Dinleyici referansları
-let _unsubHives = null, _unsubSchedules = null, _unsubRecords = null, _unsubGecmis = null, _unsubGelir = null;
+let _unsubHives = null, _unsubSchedules = null, _unsubRecords = null, _unsubGecmis = null;
 
 function loadHives() {
   if (_unsubHives) _unsubHives();
@@ -1413,17 +1405,23 @@ window.deleteHive = async function(id, durum, not) {
   if (!hive) return;
   const num = parseInt(hive.name);
 
-  // Hepsi geçmişe taşınır, numara serbest kalır (silindi hariç — o yasaklanır)
-  if (durum !== "silindi" && num > 0) addBannedNumber(num);
-  await addDoc(col("kovan_gecmis"), {
-    ...hive,
-    arsivDurum: durum,
-    arsivNot: not || "",
-    arsivTarih: new Date().toISOString().split("T")[0],
-    arsivAt: serverTimestamp(),
-  });
-  await deleteDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${id}`));
-  showToast(durum === "satildi" ? "Kovan satıldı ✓" : durum === "söndü" ? "Kovan söndü olarak işaretlendi" : "Kovan silindi, geçmişte saklanıyor ✓");
+  if (durum === "silindi") {
+    // Kalıcı sil: geçmişe gitme, numara serbest kalsın
+    await deleteDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${id}`));
+    showToast("Kovan kalıcı silindi ✓");
+  } else {
+    // Satıldı / Söndü: geçmişe taşı, numarayı yasakla
+    if (num > 0) addBannedNumber(num);
+    await addDoc(col("kovan_gecmis"), {
+      ...hive,
+      arsivDurum: durum,
+      arsivNot: not || "",
+      arsivTarih: new Date().toISOString().split("T")[0],
+      arsivAt: serverTimestamp(),
+    });
+    await deleteDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${id}`));
+    showToast(durum === "satildi" ? "Kovan satıldı ✓" : "Kovan söndü olarak işaretlendi");
+  }
   loadAll();
 };
 
@@ -1785,12 +1783,12 @@ $("hive-save").onclick = async () => {
     name,
     group: $("hive-group").value || null,
     originHiveId: $("hive-origin").value || null,
-    qpos: window._queenPos || null,
-    pos: window._queenPos ? null : selectedPos,
+    qpos: (window._queenPos && !selectedPos) ? window._queenPos : null,
     type: $("hive-type").value,
     breed: $("hive-breed").value.trim(),
     queen: $("hive-queen").value,
     strength: Number($("hive-strength").value),
+    pos: selectedPos,
     floors: Number($("hive-floors").value||1),
     frames: getKatCitaValues(),
     color: selectedColor,
@@ -2060,10 +2058,7 @@ function renderSettings() {
   const qcolsEl = $("set-qcols"); if (qcolsEl) qcolsEl.value = QCOLS;
   // Butonları her seferinde yeniden bağla
   const btnCikis = $("btn-cikis-yap");
-  if (btnCikis) btnCikis.onclick = () => {
-    [_unsubAyarlar,_unsubGelir,_unsubHives,_unsubSchedules,_unsubRecords,_unsubGecmis,window._unsubHatir].forEach(u=>u&&u());
-    signOut(auth);
-  };
+  if (btnCikis) btnCikis.onclick = window.cikisYap;
   const btnVeri = $("btn-veri-sil");
   if (btnVeri) btnVeri.onclick = window.verileriSilOnay;
   const btnHesap = $("btn-hesap-sil");
@@ -2535,7 +2530,7 @@ function renderKovanDetayTam() {
 
     <!-- Butonlar -->
     <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button onclick="closeModal('modal-kovan-detay-tam');notEkleAcDetayTam('${hive.id}')"
+      <button onclick="closeModal('modal-kovan-detay-tam');notEkleAc('${hive.id}')"
         style="flex:1;padding:10px;border:1.5px solid var(--amber);border-radius:10px;background:var(--white);color:var(--amber);cursor:pointer;font-size:13px;font-weight:700;font-family:inherit;min-width:80px">📝 Not</button>
       <button onclick="closeModal('modal-kovan-detay-tam');editHive('${hive.id}')"
         style="flex:1;padding:10px;border:1.5px solid var(--gray2);border-radius:10px;background:var(--white);cursor:pointer;font-size:13px;font-family:inherit;min-width:80px">✏️ Düzenle</button>
@@ -2689,7 +2684,6 @@ function renderHiveNotes(h) {
   }
   const sonNot = notlar[0];
   const sonKalip = sonNot.kalip ? getKaliplar().find(k => k.id === sonNot.kalip) : null;
-  const gorevAktif = sonKalip && !sonNot.tamamlandi;
   return `<div style="margin-top:8px;border-top:1px dashed var(--gray2);padding-top:8px">
     ${sonKalip ? `<div style="display:inline-flex;align-items:center;gap:3px;background:var(--amber4);color:var(--amber);border-radius:20px;padding:2px 8px;font-size:11px;font-weight:600;margin-bottom:4px">${sonKalip.ikon} ${sonKalip.ad}${sonNot.bitisT ? ` · ${new Date(sonNot.bitisT).toLocaleDateString("tr-TR",{day:"numeric",month:"short"})}` : ''}</div>` : ''}
     <div style="display:flex;gap:8px;align-items:flex-start">
@@ -2697,44 +2691,12 @@ function renderHiveNotes(h) {
         <div style="font-size:11px;color:var(--amber);font-weight:600;margin-bottom:2px">${sonNot.tarih} ${notlar.length > 1 ? `<span style="color:var(--gray)">(+${notlar.length-1} not daha)</span>` : ''}</div>
         <div style="font-size:13px;color:var(--brown2);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${sonNot.metin}${sonNot.bitisT && !sonNot.tamamlandi ? ` <span style="font-size:11px;color:var(--amber)">(${new Date(sonNot.bitisT).toLocaleDateString('tr-TR',{day:'numeric',month:'short'})})</span>` : ''}</div>
       </div>
-      ${!gorevAktif ? `<button onclick="notEkleAc('${h.id}')" style="font-size:12px;color:var(--amber);background:none;border:1px dashed var(--amber);border-radius:8px;padding:4px 8px;cursor:pointer;font-family:inherit;flex-shrink:0">+</button>` : ''}
+      <button onclick="notEkleAc('${h.id}')" style="font-size:12px;color:var(--amber);background:none;border:1px dashed var(--amber);border-radius:8px;padding:4px 8px;cursor:pointer;font-family:inherit;flex-shrink:0">+</button>
     </div>
-    ${gorevAktif ? `<div style="display:flex;gap:6px;margin-top:6px">
-      <button onclick="event.stopPropagation();kartNotTamamla('${h.id}',${h.notlar.length-1})"
-        style="flex:1;padding:5px;background:#22C55E;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit;font-weight:600">✅ Tamamlandı</button>
-      <button onclick="event.stopPropagation();kartNotErtele('${h.id}',${h.notlar.length-1})"
-        style="flex:1;padding:5px;background:var(--amber);color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit;font-weight:600">⏰ Ertele</button>
-    </div>` : ''}
   </div>`;
 }
 
 let seciliKalipId = null;
-
-window.kartNotTamamla = async function(hiveId, idx) {
-  const hive = hives.find(h => h.id === hiveId);
-  if (!hive) return;
-  const notlar = [...(hive.notlar || [])];
-  notlar[idx] = { ...notlar[idx], tamamlandi: true };
-  await updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${hiveId}`), { notlar });
-  hive.notlar = notlar;
-  showToast("✅ Tamamlandı!");
-  renderHives();
-};
-
-window.kartNotErtele = async function(hiveId, idx) {
-  const gun = prompt("Kaç gün erteleyelim?", "7");
-  if (!gun || isNaN(gun)) return;
-  const hive = hives.find(h => h.id === hiveId);
-  if (!hive) return;
-  const notlar = [...(hive.notlar || [])];
-  const yeniT = new Date();
-  yeniT.setDate(yeniT.getDate() + parseInt(gun));
-  notlar[idx] = { ...notlar[idx], bitisT: yeniT.toISOString().split("T")[0] };
-  await updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${hiveId}`), { notlar });
-  hive.notlar = notlar;
-  showToast(`⏰ ${gun} gün ertelendi`);
-  renderHives();
-};
 
 function notEkleAc(hiveId) {
   notEklenenHiveId = hiveId;
@@ -2773,27 +2735,9 @@ function notEkleAcKroki(hiveId) {
 }
 window.notEkleAcKroki = notEkleAcKroki;
 
-function notEkleAcDetayTam(hiveId) {
-  notEklenenHiveId = hiveId;
-  notEklenenKaynak = 'detayTam';
-  notDuzenlemeIdx = null;
-  $("hive-not-modal-baslik").textContent = "📝 Not Ekle";
-  $("hive-not-kaydet-btn").textContent = "Kaydet";
-  $("hive-not-text").value = "";
-  seciliKalipId = null;
-  const el = $("kalip-secici");
-  if (el) {
-    el.innerHTML = getKaliplar().map(k =>
-      `<button onclick="kalipSec('${k.id}')" id="kalip-btn-${k.id}"
-        style="padding:5px 10px;border:1.5px solid var(--gray2);border-radius:20px;background:var(--white);
-        cursor:pointer;font-size:12px;font-family:inherit;color:var(--brown2)">${k.ikon} ${k.ad}</button>`
-    ).join("");
-  }
-  openModal("modal-hive-not");
-}
-window.notEkleAcDetayTam = notEkleAcDetayTam;
-
 function notEkleAcNotlarModal(hiveId) {
+  notEklenenHiveId = hiveId;
+  notEklenenKaynak = 'notlarModal';
   $("hive-not-text").value = "";
   seciliKalipId = null;
   const el = $("kalip-secici");
@@ -2846,11 +2790,11 @@ async function hiveNotKaydet() {
   if (editingHiveId === notEklenenHiveId) {
     setTimeout(() => renderDuzenleNotlar(), 300);
   } else if (notEklenenKaynak === 'kroki') {
-    setTimeout(() => krokiAyrintilariGoster(notEklenenHiveId, true), 300);
+    setTimeout(() => kovanDetayAc(notEklenenHiveId), 300);
   } else if (notEklenenKaynak === 'notlarModal') {
     setTimeout(() => notlarModalAc(notEklenenHiveId), 300);
   } else if (notEklenenKaynak === 'detayTam') {
-    setTimeout(() => { renderKovanDetayTam(); openModal('modal-kovan-detay-tam'); }, 300);
+    setTimeout(() => renderKovanDetayTam(), 300);
   }
   notEklenenKaynak = null;
   notDuzenlemeIdx = null;
@@ -2904,7 +2848,15 @@ let kovanGecmis = [];
 function loadKovanGecmis() {
   if (_unsubGecmis) _unsubGecmis();
   _unsubGecmis = onSnapshot(query(col("kovan_gecmis"), orderBy("arsivAt", "desc")), snap => {
-    kovanGecmis = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // Yanlışlıkla geçmişe girmiş "silindi" kayıtlarını temizle
+    snap.docs.forEach(d => {
+      if (d.data().arsivDurum === "silindi") {
+        deleteDoc(doc(db, `users/${currentUser.uid}/kovan_gecmis/${d.id}`));
+      }
+    });
+    kovanGecmis = snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(k => k.arsivDurum !== "silindi");
     renderGecmis();
   });
 }
@@ -3188,7 +3140,7 @@ function renderAnaliz() {
   const gruplamalar = [
     {
       id: "cita",
-      baslik: "🍯 Çıta Sayısına Göre",
+      baslik: "🪵 Çıta Sayısına Göre",
       grupla: h => toplamCita(h) + " Çıta",
       sirala: (a, b) => parseInt(b) - parseInt(a),
     },
@@ -3227,15 +3179,6 @@ function renderAnaliz() {
       baslik: "🐝 Irka Göre",
       grupla: h => h.breed || "❓ Belirtilmemiş",
     },
-    // Kalıp bazlı gruplamalar
-    ...getKaliplar().map(k => ({
-      id: `kalip_${k.id}`,
-      baslik: `${k.ikon} ${k.ad}`,
-      grupla: h => {
-        const aktifNot = (h.notlar||[]).find(n => n.kalip === k.id && !n.tamamlandi);
-        return aktifNot ? `${k.ikon} ${k.ad}` : null;
-      },
-    })),
   ];
 
   function gruplariRender(gruplamaDef) {
@@ -3262,7 +3205,7 @@ function renderAnaliz() {
           ${grupMap[grup].map(h => `
             <div onclick="kovanDetayAc('${h.id}')" style="background:${h.color||'var(--amber)'};border-radius:8px;padding:6px 10px;cursor:pointer;display:flex;align-items:center;gap:6px;min-width:52px">
               <span style="font-size:14px;font-weight:800;color:#fff">${h.name}</span>
-              <span style="font-size:10px;color:rgba(255,255,255,0.85)">${toplamCita(h)}🍯</span>
+              <span style="font-size:10px;color:rgba(255,255,255,0.85)">${toplamCita(h)}🪵</span>
             </div>`).join("")}
         </div>
       </div>`).join("");
@@ -3389,25 +3332,24 @@ function renderHome() {
   if (aktifHatir.length) {
     html += `<div style="background:var(--white);border-radius:var(--radius);padding:16px;margin-bottom:10px;box-shadow:var(--shadow)">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <span style="font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:var(--brown)">🔔 Hatırlatmalar (${aktifHatir.length})</span>
+        <span style="font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:var(--brown)">🔔 Hatırlatmalar</span>
         <button onclick="hatirlatmaEkleAc()" style="background:var(--amber);color:#fff;border:none;border-radius:8px;padding:4px 10px;font-size:12px;cursor:pointer;font-family:inherit;font-weight:700">+ Ekle</button>
       </div>
-      <div style="max-height:260px;overflow-y:auto">
-      ${aktifHatir.map(h => {
+      ${aktifHatir.slice(0,5).map(h => {
         const tarih = new Date(h.bitisT + 'T00:00:00');
         const gecti = tarih < bugun;
         const bugunMu = tarih.getTime() === bugun.getTime();
         return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--gray2)">
-          <div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:${gecti?'#EF4444':bugunMu?'var(--amber)':'#3B82F6'}"></div>
+          <div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:${gecti?'var(--red)':bugunMu?'var(--amber)':'#3B82F6'}"></div>
           <div style="flex:1">
             <div style="font-size:13px;color:var(--brown)">${h.metin}</div>
-            <div style="font-size:11px;color:${gecti?'#EF4444':'var(--gray)'}">${gecti?'⚠️ Gecikmiş · ':bugunMu?'📅 Bugün · ':''}${tarih.toLocaleDateString('tr-TR',{day:'numeric',month:'short'})}</div>
+            <div style="font-size:11px;color:${gecti?'var(--red)':'var(--gray)'}">${gecti?'⚠️ Gecikmiş · ':bugunMu?'📅 Bugün · ':''}${tarih.toLocaleDateString('tr-TR',{day:'numeric',month:'short'})}</div>
           </div>
-          <button onclick="hatirlatmaTamamlaOnay('${h.id}')" style="background:none;border:none;color:#22C55E;cursor:pointer;font-size:18px">✅</button>
+          <button onclick="hatirlatmaTamamla('${h.id}')" style="background:none;border:none;color:#22C55E;cursor:pointer;font-size:18px">✅</button>
           <button onclick="hatirlatmaErtele('${h.id}')" style="background:none;border:none;color:var(--amber);cursor:pointer;font-size:16px">⏰</button>
         </div>`;
       }).join('')}
-      </div>
+      ${aktifHatir.length > 5 ? `<div style="font-size:12px;color:var(--gray);text-align:center;margin-top:6px">${aktifHatir.length-5} hatırlatma daha...</div>` : ''}
     </div>`;
   } else {
     html += `<button onclick="hatirlatmaEkleAc()" style="width:100%;padding:12px;background:var(--white);color:var(--amber);border:1.5px dashed var(--amber);border-radius:var(--radius);font-size:14px;cursor:pointer;font-family:inherit;font-weight:600;margin-bottom:10px">🔔 Hatırlatma Ekle</button>`;
@@ -3448,13 +3390,10 @@ window.hatirlatmaKaydet = async function() {
   closeModal("modal-hatirlatma");
 };
 
-window.hatirlatmaTamamlaOnay = async function(id) {
-  if (!confirm("Bu hatırlatma tamamlandı olarak işaretlensin mi?")) return;
+window.hatirlatmaTamamla = async function(id) {
   await updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/hatirlatmalar/${id}`), { tamamlandi: true });
   showToast("✅ Tamamlandı!");
 };
-
-window.hatirlatmaTamamla = window.hatirlatmaTamamlaOnay;
 
 window.hatirlatmaErtele = async function(id) {
   const gun = prompt("Kaç gün erteleyelim?", "3");
@@ -3827,7 +3766,7 @@ function krokiHucreHTML(hive, isSecili) {
   if (floors === 2) inner = '<div style="position:absolute;top:12px;left:0;right:0;height:2px;background:rgba(255,255,255,0.7)"></div>';
   if (floors >= 3) inner = '<div style="position:absolute;top:12px;left:0;right:0;height:2px;background:rgba(255,255,255,0.7)"></div><div style="position:absolute;top:24px;left:0;right:0;height:2px;background:rgba(255,255,255,0.7)"></div>';
   const aktifKalipNot = (hive.notlar||[]).some(n => n.kalip && !n.tamamlandi);
-  const zil = aktifKalipNot ? `<div onclick="event.stopPropagation();notlarModalAc('${hive.id}')" style="position:absolute;top:2px;right:2px;font-size:7px;line-height:1;cursor:pointer">🔔</div>` : '';
+  const zil = aktifKalipNot ? `<div style="position:absolute;top:2px;right:2px;font-size:7px;line-height:1;pointer-events:none">🔔</div>` : '';
   return `<div onclick="selectHiveFromKroki('${hive.id}')" style="width:24px;height:36px;border-radius:4px;position:relative;overflow:hidden;background:${color};border:${border};box-shadow:${shadow};cursor:pointer;flex-shrink:0;display:flex;align-items:flex-end;justify-content:center;font-size:10px;color:#fff;font-weight:800;transform:${scale};transition:all .15s;padding-bottom:2px">${inner}${zil}${hive.name}</div>`;
 }
 
@@ -3916,10 +3855,14 @@ window.selectPos = function(r, c) {
 let krokiSeciliHiveId = null;
 
 window.selectHiveFromKroki = function(id) {
-  if (activeTab === "kroki") {
-    if (krokiSeciliHiveId) { krokiSecimKaldir(); return; }
+  if (activeTab === "kroki" && krokiSeciliHiveId) {
+    krokiSecimKaldir();
+    return;
   }
-  kovanDetayAc(id);
+  closeModal('modal-kovan-detay');
+  detayHiveId = id;
+  renderKovanDetayTam();
+  openModal("modal-kovan-detay-tam");
 };
 
 function krokiAyrintilariGoster(id, krokiMod) {
@@ -4052,12 +3995,6 @@ function switchTab(key) {
 
 // Başlangıçta kayıtlı sekme sırası uygula
 applyTabOrder(getTabOrder());
-// Çıkış butonunu direkt bağla
-const _bc = $("btn-cikis-yap");
-if (_bc) _bc.onclick = () => {
-  [_unsubAyarlar,_unsubGelir,_unsubHives,_unsubSchedules,_unsubRecords,_unsubGecmis,window._unsubHatir].forEach(u=>u&&u());
-  signOut(auth);
-};
 activeTab = "home";
 document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === "home"));
 ["tab-home","tab-hives","tab-schedule","tab-records","tab-gecmis","tab-gelir","tab-analiz","tab-kroki","tab-settings"].forEach(id => {
@@ -4603,7 +4540,7 @@ window.queenSecimKaldir = function() {
 window.queenTasiKaydet = async function() {
   const yeniPoz = queenPendingPos[queenSeciliHiveId];
   if (!yeniPoz) { queenSecimKaldir(); return; }
-  await updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${queenSeciliHiveId}`), { qpos: yeniPoz, pos: null });
+  await updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${queenSeciliHiveId}`), { qpos: yeniPoz });
   showToast("✓ Kraliçe kutusu konumu güncellendi");
   queenPendingPos = {}; queenOriginalPos = {};
   queenSeciliHiveId = null;
