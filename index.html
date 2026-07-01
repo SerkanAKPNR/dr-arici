@@ -2416,6 +2416,7 @@ function getDetayList() {
 }
 
 function kovanDetayAc(id) {
+  closeModal("modal-kovan-detay");
   detayHiveId = id;
   renderKovanDetayTam();
   openModal("modal-kovan-detay-tam");
@@ -4264,6 +4265,7 @@ window.krokidenKovanEkle = function(row, col) {
 window.notlarModalAc = function(hiveId) {
   const hive = hives.find(h => h.id === hiveId);
   if (!hive) return;
+  closeModal("modal-kovan-detay-tam");
   const notlar = (hive.notlar || []).slice().reverse();
   const bugun = new Date(); bugun.setHours(0,0,0,0);
   $("kovan-detay-icerik").innerHTML = `
