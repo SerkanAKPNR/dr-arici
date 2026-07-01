@@ -753,12 +753,12 @@
 </div>
 <!-- MODAL: Kovan Detay -->
 <div class="modal-overlay" id="modal-kovan-detay-tam">
-  <div class="modal" style="display:flex;flex-direction:column;height:88vh;max-height:88vh;padding-bottom:0">
+  <div class="modal" style="display:flex;flex-direction:column;height:88vh;height:88dvh;max-height:88vh;max-height:88dvh;padding-bottom:0">
     <div class="modal-handle" style="flex-shrink:0"></div>
     <!-- Başlık — kapat butonu -->
-    <div style="display:flex;justify-content:flex-end;margin-bottom:8px;flex-shrink:0">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:8px;flex-shrink:0;position:relative;z-index:2">
       <button onclick="closeModal('modal-kovan-detay-tam')"
-        style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--gray)">✕</button>
+        style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--gray);padding:6px 10px">✕</button>
     </div>
     <!-- İçerik — scroll -->
     <div id="kovan-detay-tam-icerik" style="flex:1;overflow-y:auto;padding-bottom:8px"></div>
