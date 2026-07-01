@@ -477,6 +477,9 @@
           <button onclick="saveFramesSetting()"
             style="margin-left:auto;background:var(--amber);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-weight:700;cursor:pointer;font-size:13px">Kaydet</button>
         </div>
+        <div style="font-size:12px;color:var(--gray);margin:10px 0 6px">Numaralandırma Yönü</div>
+        <div style="display:flex;gap:6px;margin-bottom:8px" id="yon-satir-butonlari"></div>
+        <div style="display:flex;gap:6px;margin-bottom:12px" id="yon-sutun-butonlari"></div>
       </div>
 
       <div class="sec-title">Yedekleme</div>
@@ -1195,6 +1198,12 @@ function loadAyarlar() {
       if (d.tipler) localStorage.setItem("kovan_tipleri", JSON.stringify(d.tipler));
       if (d.bannedNumbers) localStorage.setItem("banned_hive_numbers", JSON.stringify(d.bannedNumbers));
       if (d.framesPerFloor) localStorage.setItem("frames_per_floor", String(d.framesPerFloor));
+      if (d.krokiRows) { ROWS = d.krokiRows; localStorage.setItem("kroki_rows", d.krokiRows); }
+      if (d.krokiCols) { COLS = d.krokiCols; localStorage.setItem("kroki_cols", d.krokiCols); }
+      if (d.queenRows) { QROWS = d.queenRows; localStorage.setItem("queen_rows", d.queenRows); }
+      if (d.queenCols) { QCOLS = d.queenCols; localStorage.setItem("queen_cols", d.queenCols); }
+      if (typeof d.satirTers === "boolean") { SATIR_TERS = d.satirTers; localStorage.setItem("kroki_satir_ters", d.satirTers ? "1" : "0"); }
+      if (typeof d.sutunTers === "boolean") { SUTUN_TERS = d.sutunTers; localStorage.setItem("kroki_sutun_ters", d.sutunTers ? "1" : "0"); }
     }
     // Render
     if (document.getElementById("grup-listesi")) renderGrupListesi();
@@ -1202,6 +1211,8 @@ function loadAyarlar() {
     if (document.getElementById("tip-listesi")) renderTipListesi();
     populateHiveTypeSelect();
     if (activeTab === "analiz") renderAnaliz();
+    if (activeTab === "kroki") { renderKroki(); renderQueenKroki(); }
+    if (activeTab === "settings") renderYonButonlari();
   });
 }
 
@@ -1218,6 +1229,8 @@ async function saveAyarlarToFirestore() {
     krokiCols: COLS,
     queenRows: QROWS,
     queenCols: QCOLS,
+    satirTers: SATIR_TERS,
+    sutunTers: SUTUN_TERS,
   }, { merge: true });
 }
 
@@ -2072,6 +2085,7 @@ function renderSettings() {
   const colsEl = $("set-cols"); if (colsEl) colsEl.value = COLS;
   const qrowsEl = $("set-qrows"); if (qrowsEl) qrowsEl.value = QROWS;
   const qcolsEl = $("set-qcols"); if (qcolsEl) qcolsEl.value = QCOLS;
+  renderYonButonlari();
   // Butonları her seferinde yeniden bağla
   const btnCikis = $("btn-cikis-yap");
   if (btnCikis) btnCikis.onclick = () => {
@@ -3720,7 +3734,51 @@ let ROWS = parseInt(localStorage.getItem("kroki_rows") || "3");
 let COLS = parseInt(localStorage.getItem("kroki_cols") || "50");
 let QROWS = parseInt(localStorage.getItem("queen_rows") || "2");
 let QCOLS = parseInt(localStorage.getItem("queen_cols") || "20");
+let SATIR_TERS = localStorage.getItem("kroki_satir_ters") === "1"; // false = yukarıdan aşağı (varsayılan)
+let SUTUN_TERS = localStorage.getItem("kroki_sutun_ters") === "1"; // false = sağdan sola (varsayılan/mevcut davranış)
 let selectedPos = null; // {row, col}
+
+// Numaralandırma yönüne göre satır/sütun render sırasını hesaplar.
+// Dönen diziler DATA index'lerini, ekranda soldan sağa / yukarıdan aşağı hangi sırayla
+// çizileceğini belirtir. Etiket her zaman "sıradaki konum + 1" olur.
+function krokiSiralama(rowCount, colCount) {
+  const rowSeq = SATIR_TERS
+    ? Array.from({length: rowCount}, (_, i) => rowCount - 1 - i)
+    : Array.from({length: rowCount}, (_, i) => i);
+  const colSeq = SUTUN_TERS
+    ? Array.from({length: colCount}, (_, i) => i)
+    : Array.from({length: colCount}, (_, i) => colCount - 1 - i);
+  return { rowSeq, colSeq };
+}
+
+function saveKrokiYonu(eksen, tersMi) {
+  if (eksen === "satir") {
+    SATIR_TERS = tersMi;
+    localStorage.setItem("kroki_satir_ters", tersMi ? "1" : "0");
+  } else {
+    SUTUN_TERS = tersMi;
+    localStorage.setItem("kroki_sutun_ters", tersMi ? "1" : "0");
+  }
+  saveAyarlarToFirestore();
+  renderKroki(); renderQueenKroki(); renderMiniGrid(); renderMiniQueenGrid();
+  if ($("toplu-mini-kroki")) renderTopluMiniKroki();
+  renderYonButonlari();
+}
+window.saveKrokiYonu = saveKrokiYonu;
+
+function renderYonButonlari() {
+  const satirEl = $("yon-satir-butonlari");
+  const sutunEl = $("yon-sutun-butonlari");
+  const aktifStil = "flex:1;padding:8px;border:none;border-radius:8px;background:var(--amber);color:#fff;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit";
+  const pasifStil = "flex:1;padding:8px;border:1.5px solid var(--gray2);border-radius:8px;background:var(--white);color:var(--brown2);font-size:12px;cursor:pointer;font-family:inherit";
+  if (satirEl) satirEl.innerHTML = `
+    <button onclick="saveKrokiYonu('satir',false)" style="${!SATIR_TERS ? aktifStil : pasifStil}">⬇️ Yukarıdan Aşağı</button>
+    <button onclick="saveKrokiYonu('satir',true)" style="${SATIR_TERS ? aktifStil : pasifStil}">⬆️ Aşağıdan Yukarı</button>`;
+  if (sutunEl) sutunEl.innerHTML = `
+    <button onclick="saveKrokiYonu('sutun',false)" style="${!SUTUN_TERS ? aktifStil : pasifStil}">⬅️ Sağdan Sola</button>
+    <button onclick="saveKrokiYonu('sutun',true)" style="${SUTUN_TERS ? aktifStil : pasifStil}">➡️ Soldan Sağa</button>`;
+}
+window.renderYonButonlari = renderYonButonlari;
 
 function posKey(r, c) { return `${r}-${c}`; }
 function hiveAtPos(r, c) {
@@ -3752,18 +3810,17 @@ function updatePosLabel() {
 function renderMiniGrid() {
   const el = $("mini-grid");
   if (!el) return;
-  // Başlık — sağdan sola
   let html = `<div style="display:flex;flex-direction:column;gap:3px;min-width:${COLS*22+18}px">`;
+  const { rowSeq, colSeq } = krokiSiralama(ROWS, COLS);
   html += `<div style="display:flex;gap:3px;padding-left:18px">`;
-  for (let c = COLS-1; c >= 0; c--) {
-    html += `<div style="width:20px;text-align:center;font-size:8px;color:var(--gray);flex-shrink:0">${COLS-c}</div>`;
-  }
+  colSeq.forEach((c, ci) => {
+    html += `<div style="width:20px;text-align:center;font-size:8px;color:var(--gray);flex-shrink:0">${ci+1}</div>`;
+  });
   html += `</div>`;
-  for (let r = 0; r < ROWS; r++) {
+  rowSeq.forEach((r, ri) => {
     html += `<div style="display:flex;gap:3px;align-items:center">`;
-    html += `<span style="font-size:10px;color:var(--gray);width:14px;flex-shrink:0">${r+1}</span>`;
-    // Sağdan sola
-    for (let c = COLS-1; c >= 0; c--) {
+    html += `<span style="font-size:10px;color:var(--gray);width:14px;flex-shrink:0">${ri+1}</span>`;
+    colSeq.forEach((c, ci) => {
       const hive = hiveAtPos(r, c);
       const isSel = selectedPos && selectedPos.row === r && selectedPos.col === c;
       const isOccupied = hive && !(editingHiveId && hive.id === editingHiveId);
@@ -3771,12 +3828,12 @@ function renderMiniGrid() {
       if (isOccupied) { bg = hive.color || '#F59E0B'; border = hive.color || '#F59E0B'; cursor = 'not-allowed'; }
       else if (isSel) { bg = '#FCD34D'; border = '#D97706'; }
       html += `<div onclick="selectPos(${r},${c})"
-        title="${isOccupied ? hive.name+'. Kovan' : `Sıra ${r+1}, Sağdan ${COLS-c}`}"
+        title="${isOccupied ? hive.name+'. Kovan' : `Sıra ${ri+1}, Sütun ${ci+1}`}"
         style="width:20px;height:20px;border-radius:3px;background:${bg};border:1.5px solid ${border};cursor:${cursor};flex-shrink:0;transition:all .1s;display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;font-weight:700">
         ${isOccupied ? hive.name : ''}</div>`;
-    }
+    });
     html += `</div>`;
-  }
+  });
   html += `</div>`;
   el.innerHTML = html;
 }
@@ -3788,15 +3845,16 @@ function renderMiniQueenGrid() {
   if (!el) return;
   const seciliPos = window._queenPos;
   let html = `<div style="display:flex;flex-direction:column;gap:3px;min-width:${QCOLS*22+18}px">`;
+  const { rowSeq, colSeq } = krokiSiralama(QROWS, QCOLS);
   html += `<div style="display:flex;gap:3px;padding-left:18px">`;
-  for (let c = QCOLS-1; c >= 0; c--) {
-    html += `<div style="width:20px;text-align:center;font-size:8px;color:var(--gray);flex-shrink:0">${QCOLS-c}</div>`;
-  }
+  colSeq.forEach((c, ci) => {
+    html += `<div style="width:20px;text-align:center;font-size:8px;color:var(--gray);flex-shrink:0">${ci+1}</div>`;
+  });
   html += `</div>`;
-  for (let r = 0; r < QROWS; r++) {
+  rowSeq.forEach((r, ri) => {
     html += `<div style="display:flex;gap:3px;align-items:center">`;
-    html += `<span style="font-size:10px;color:var(--gray);width:14px;flex-shrink:0">${r+1}</span>`;
-    for (let c = QCOLS-1; c >= 0; c--) {
+    html += `<span style="font-size:10px;color:var(--gray);width:14px;flex-shrink:0">${ri+1}</span>`;
+    colSeq.forEach((c, ci) => {
       const hive = qhiveAtPos(r, c);
       const isSel = seciliPos && seciliPos.row === r && seciliPos.col === c;
       const isOccupied = hive && !(editingHiveId && hive.id === editingHiveId);
@@ -3804,12 +3862,12 @@ function renderMiniQueenGrid() {
       if (isOccupied) { bg = hive.color || '#F59E0B'; border = hive.color || '#F59E0B'; cursor = 'not-allowed'; }
       else if (isSel) { bg = '#FCD34D'; border = '#D97706'; }
       html += `<div onclick="selectQueenPos(${r},${c})"
-        title="${isOccupied ? hive.name+'. Kovan' : 'Sıra '+(r+1)+', Sağdan '+(QCOLS-c)}"
+        title="${isOccupied ? hive.name+'. Kovan' : 'Sıra '+(ri+1)+', Sütun '+(ci+1)}"
         style="width:20px;height:20px;border-radius:3px;background:${bg};border:1.5px solid ${border};cursor:${cursor};flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;font-weight:700">
         ${isOccupied ? hive.name : ''}</div>`;
-    }
+    });
     html += `</div>`;
-  }
+  });
   html += `</div>`;
   el.innerHTML = html;
 }
@@ -3867,20 +3925,19 @@ function renderKroki(mod) {
   const gap = mod === "toplu" ? 2 : 4;
   let html = `<div style="display:flex;flex-direction:column;gap:${gap}px;min-width:${COLS*(hucreW+gap)+22}px">`;
 
+  const { rowSeq, colSeq } = krokiSiralama(ROWS, COLS);
 
-
-  // Başlık — sağdan sola: sağdan 1, 2, 3...
+  // Başlık
   html += `<div style="display:flex;gap:${gap}px;padding-left:22px">`;
-  for (let c = COLS-1; c >= 0; c--) {
-    html += `<div style="width:${hucreW}px;text-align:center;font-size:8px;color:var(--gray);flex-shrink:0">${COLS-c}</div>`;
-  }
+  colSeq.forEach((c, ci) => {
+    html += `<div style="width:${hucreW}px;text-align:center;font-size:8px;color:var(--gray);flex-shrink:0">${ci+1}</div>`;
+  });
   html += `</div>`;
 
-  for (let r = 0; r < ROWS; r++) {
+  rowSeq.forEach((r, ri) => {
     html += `<div style="display:flex;gap:${gap}px;align-items:center">`;
-    html += `<span style="font-size:10px;font-weight:700;color:var(--brown2);width:18px;flex-shrink:0">${r+1}</span>`;
-    // Sağdan sola çiz
-    for (let c = COLS-1; c >= 0; c--) {
+    html += `<span style="font-size:10px;font-weight:700;color:var(--brown2);width:18px;flex-shrink:0">${ri+1}</span>`;
+    colSeq.forEach((c, ci) => {
       const hive = hiveAtPos(r, c);
       if (hive) {
         const isSecili = hive.id === krokiSeciliHiveId;
@@ -3889,16 +3946,16 @@ function renderKroki(mod) {
         if (mod === "toplu") {
           html += `<div style="width:${hucreW}px;height:${hucreH}px;border-radius:3px;background:#F9FAFB;border:1px dashed #E5E7EB;flex-shrink:0"></div>`;
         } else {
-          html += `<div title="Sıra ${r+1}, Sağdan ${COLS-c} — Kovan ekle"
+          html += `<div title="Sıra ${ri+1}, Sütun ${ci+1} — Kovan ekle"
             onclick="krokidenKovanEkle(${r},${c})"
             style="width:24px;height:36px;border-radius:4px;background:#F9FAFB;border:1.5px dashed #D1D5DB;
             cursor:pointer;flex-shrink:0;transition:background .15s"
             onmouseover="this.style.background='#FEF3C7'" onmouseout="this.style.background='#F9FAFB'"></div>`;
         }
       }
-    }
+    });
     html += `</div>`;
-  }
+  });
   html += `</div>`;
 
   if (mod === 'toplu') { el.innerHTML = html; return; }
@@ -4405,28 +4462,29 @@ function renderQueenKroki() {
   const el = $("queen-grid");
   if (!el) return;
   let html = `<div style="display:flex;flex-direction:column;gap:6px;min-width:${QCOLS*28+24}px">`;
+  const { rowSeq, colSeq } = krokiSiralama(QROWS, QCOLS);
   html += `<div style="display:flex;gap:4px;padding-left:22px">`;
-  for (let c = QCOLS-1; c >= 0; c--) {
-    html += `<div style="width:24px;text-align:center;font-size:9px;color:var(--gray);flex-shrink:0">${QCOLS-c}</div>`;
-  }
+  colSeq.forEach((c, ci) => {
+    html += `<div style="width:24px;text-align:center;font-size:9px;color:var(--gray);flex-shrink:0">${ci+1}</div>`;
+  });
   html += `</div>`;
-  for (let r = 0; r < QROWS; r++) {
+  rowSeq.forEach((r, ri) => {
     html += `<div style="display:flex;gap:4px;align-items:center">`;
-    html += `<span style="font-size:10px;font-weight:700;color:var(--brown2);width:18px;flex-shrink:0">${r+1}</span>`;
-    for (let c = QCOLS-1; c >= 0; c--) {
+    html += `<span style="font-size:10px;font-weight:700;color:var(--brown2);width:18px;flex-shrink:0">${ri+1}</span>`;
+    colSeq.forEach((c, ci) => {
       const hive = qhiveAtPos(r, c);
       if (hive) {
         const isSecili = hive.id === queenSeciliHiveId;
         html += krokiHucreHTML(hive, isSecili);
       } else {
-        html += `<div onclick="queendenKovanEkle(${r},${c})" title="Sıra ${r+1}, Sağdan ${QCOLS-c}"
+        html += `<div onclick="queendenKovanEkle(${r},${c})" title="Sıra ${ri+1}, Sütun ${ci+1}"
           style="width:24px;height:36px;border-radius:4px;background:#FFF9E6;border:1.5px dashed var(--amber3);
           cursor:pointer;flex-shrink:0;transition:background .15s"
           onmouseover="this.style.background='#FEF3C7'" onmouseout="this.style.background='#FFF9E6'"></div>`;
       }
-    }
+    });
     html += `</div>`;
-  }
+  });
   html += `</div>`;
   el.innerHTML = html;
 }
