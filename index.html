@@ -3738,18 +3738,10 @@ let SATIR_TERS = localStorage.getItem("kroki_satir_ters") === "1"; // false = yu
 let SUTUN_TERS = localStorage.getItem("kroki_sutun_ters") === "1"; // false = sağdan sola (varsayılan/mevcut davranış)
 let selectedPos = null; // {row, col}
 
-// Numaralandırma yönüne göre satır/sütun render sırasını hesaplar.
-// Dönen diziler DATA index'lerini, ekranda soldan sağa / yukarıdan aşağı hangi sırayla
-// çizileceğini belirtir. Etiket her zaman "sıradaki konum + 1" olur.
-function krokiSiralama(rowCount, colCount) {
-  const rowSeq = SATIR_TERS
-    ? Array.from({length: rowCount}, (_, i) => rowCount - 1 - i)
-    : Array.from({length: rowCount}, (_, i) => i);
-  const colSeq = SUTUN_TERS
-    ? Array.from({length: colCount}, (_, i) => i)
-    : Array.from({length: colCount}, (_, i) => colCount - 1 - i);
-  return { rowSeq, colSeq };
-}
+// Sütun/satır ETİKETİ hesaplar — kovanların ekrandaki fiziksel yeri HİÇBİR ZAMAN
+// değişmez, sadece üstteki/yandaki numara yön ayarına göre ayna gibi ters okunur.
+function sutunEtiket(c, totalCols) { return SUTUN_TERS ? (c + 1) : (totalCols - c); }
+function satirEtiket(r, totalRows) { return SATIR_TERS ? (totalRows - r) : (r + 1); }
 
 function saveKrokiYonu(eksen, tersMi) {
   if (eksen === "satir") {
@@ -3775,8 +3767,8 @@ function renderYonButonlari() {
     <button onclick="saveKrokiYonu('satir',false)" style="${!SATIR_TERS ? aktifStil : pasifStil}">⬇️ Yukarıdan Aşağı</button>
     <button onclick="saveKrokiYonu('satir',true)" style="${SATIR_TERS ? aktifStil : pasifStil}">⬆️ Aşağıdan Yukarı</button>`;
   if (sutunEl) sutunEl.innerHTML = `
-    <button onclick="saveKrokiYonu('sutun',false)" style="${!SUTUN_TERS ? aktifStil : pasifStil}">⬅️ Sağdan Sola</button>
-    <button onclick="saveKrokiYonu('sutun',true)" style="${SUTUN_TERS ? aktifStil : pasifStil}">➡️ Soldan Sağa</button>`;
+    <button onclick="saveKrokiYonu('sutun',false)" style="${!SUTUN_TERS ? aktifStil : pasifStil}">➡️ Soldan Sağa</button>
+    <button onclick="saveKrokiYonu('sutun',true)" style="${SUTUN_TERS ? aktifStil : pasifStil}">⬅️ Sağdan Sola</button>`;
 }
 window.renderYonButonlari = renderYonButonlari;
 
@@ -3811,16 +3803,15 @@ function renderMiniGrid() {
   const el = $("mini-grid");
   if (!el) return;
   let html = `<div style="display:flex;flex-direction:column;gap:3px;min-width:${COLS*22+18}px">`;
-  const { rowSeq, colSeq } = krokiSiralama(ROWS, COLS);
   html += `<div style="display:flex;gap:3px;padding-left:18px">`;
-  colSeq.forEach((c, ci) => {
-    html += `<div style="width:20px;text-align:center;font-size:8px;color:var(--gray);flex-shrink:0">${ci+1}</div>`;
-  });
+  for (let c = COLS-1; c >= 0; c--) {
+    html += `<div style="width:20px;text-align:center;font-size:8px;color:var(--gray);flex-shrink:0">${sutunEtiket(c,COLS)}</div>`;
+  }
   html += `</div>`;
-  rowSeq.forEach((r, ri) => {
+  for (let r = 0; r < ROWS; r++) {
     html += `<div style="display:flex;gap:3px;align-items:center">`;
-    html += `<span style="font-size:10px;color:var(--gray);width:14px;flex-shrink:0">${ri+1}</span>`;
-    colSeq.forEach((c, ci) => {
+    html += `<span style="font-size:10px;color:var(--gray);width:14px;flex-shrink:0">${satirEtiket(r,ROWS)}</span>`;
+    for (let c = COLS-1; c >= 0; c--) {
       const hive = hiveAtPos(r, c);
       const isSel = selectedPos && selectedPos.row === r && selectedPos.col === c;
       const isOccupied = hive && !(editingHiveId && hive.id === editingHiveId);
@@ -3828,12 +3819,12 @@ function renderMiniGrid() {
       if (isOccupied) { bg = hive.color || '#F59E0B'; border = hive.color || '#F59E0B'; cursor = 'not-allowed'; }
       else if (isSel) { bg = '#FCD34D'; border = '#D97706'; }
       html += `<div onclick="selectPos(${r},${c})"
-        title="${isOccupied ? hive.name+'. Kovan' : `Sıra ${ri+1}, Sütun ${ci+1}`}"
+        title="${isOccupied ? hive.name+'. Kovan' : `Sıra ${satirEtiket(r,ROWS)}, Sütun ${sutunEtiket(c,COLS)}`}"
         style="width:20px;height:20px;border-radius:3px;background:${bg};border:1.5px solid ${border};cursor:${cursor};flex-shrink:0;transition:all .1s;display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;font-weight:700">
         ${isOccupied ? hive.name : ''}</div>`;
-    });
+    }
     html += `</div>`;
-  });
+  }
   html += `</div>`;
   el.innerHTML = html;
 }
@@ -3845,16 +3836,15 @@ function renderMiniQueenGrid() {
   if (!el) return;
   const seciliPos = window._queenPos;
   let html = `<div style="display:flex;flex-direction:column;gap:3px;min-width:${QCOLS*22+18}px">`;
-  const { rowSeq, colSeq } = krokiSiralama(QROWS, QCOLS);
   html += `<div style="display:flex;gap:3px;padding-left:18px">`;
-  colSeq.forEach((c, ci) => {
-    html += `<div style="width:20px;text-align:center;font-size:8px;color:var(--gray);flex-shrink:0">${ci+1}</div>`;
-  });
+  for (let c = QCOLS-1; c >= 0; c--) {
+    html += `<div style="width:20px;text-align:center;font-size:8px;color:var(--gray);flex-shrink:0">${sutunEtiket(c,QCOLS)}</div>`;
+  }
   html += `</div>`;
-  rowSeq.forEach((r, ri) => {
+  for (let r = 0; r < QROWS; r++) {
     html += `<div style="display:flex;gap:3px;align-items:center">`;
-    html += `<span style="font-size:10px;color:var(--gray);width:14px;flex-shrink:0">${ri+1}</span>`;
-    colSeq.forEach((c, ci) => {
+    html += `<span style="font-size:10px;color:var(--gray);width:14px;flex-shrink:0">${satirEtiket(r,QROWS)}</span>`;
+    for (let c = QCOLS-1; c >= 0; c--) {
       const hive = qhiveAtPos(r, c);
       const isSel = seciliPos && seciliPos.row === r && seciliPos.col === c;
       const isOccupied = hive && !(editingHiveId && hive.id === editingHiveId);
@@ -3862,12 +3852,12 @@ function renderMiniQueenGrid() {
       if (isOccupied) { bg = hive.color || '#F59E0B'; border = hive.color || '#F59E0B'; cursor = 'not-allowed'; }
       else if (isSel) { bg = '#FCD34D'; border = '#D97706'; }
       html += `<div onclick="selectQueenPos(${r},${c})"
-        title="${isOccupied ? hive.name+'. Kovan' : 'Sıra '+(ri+1)+', Sütun '+(ci+1)}"
+        title="${isOccupied ? hive.name+'. Kovan' : 'Sıra '+satirEtiket(r,QROWS)+', Sütun '+sutunEtiket(c,QCOLS)}"
         style="width:20px;height:20px;border-radius:3px;background:${bg};border:1.5px solid ${border};cursor:${cursor};flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;font-weight:700">
         ${isOccupied ? hive.name : ''}</div>`;
-    });
+    }
     html += `</div>`;
-  });
+  }
   html += `</div>`;
   el.innerHTML = html;
 }
@@ -3925,19 +3915,17 @@ function renderKroki(mod) {
   const gap = mod === "toplu" ? 2 : 4;
   let html = `<div style="display:flex;flex-direction:column;gap:${gap}px;min-width:${COLS*(hucreW+gap)+22}px">`;
 
-  const { rowSeq, colSeq } = krokiSiralama(ROWS, COLS);
-
   // Başlık
   html += `<div style="display:flex;gap:${gap}px;padding-left:22px">`;
-  colSeq.forEach((c, ci) => {
-    html += `<div style="width:${hucreW}px;text-align:center;font-size:8px;color:var(--gray);flex-shrink:0">${ci+1}</div>`;
-  });
+  for (let c = COLS-1; c >= 0; c--) {
+    html += `<div style="width:${hucreW}px;text-align:center;font-size:8px;color:var(--gray);flex-shrink:0">${sutunEtiket(c,COLS)}</div>`;
+  }
   html += `</div>`;
 
-  rowSeq.forEach((r, ri) => {
+  for (let r = 0; r < ROWS; r++) {
     html += `<div style="display:flex;gap:${gap}px;align-items:center">`;
-    html += `<span style="font-size:10px;font-weight:700;color:var(--brown2);width:18px;flex-shrink:0">${ri+1}</span>`;
-    colSeq.forEach((c, ci) => {
+    html += `<span style="font-size:10px;font-weight:700;color:var(--brown2);width:18px;flex-shrink:0">${satirEtiket(r,ROWS)}</span>`;
+    for (let c = COLS-1; c >= 0; c--) {
       const hive = hiveAtPos(r, c);
       if (hive) {
         const isSecili = hive.id === krokiSeciliHiveId;
@@ -3946,16 +3934,16 @@ function renderKroki(mod) {
         if (mod === "toplu") {
           html += `<div style="width:${hucreW}px;height:${hucreH}px;border-radius:3px;background:#F9FAFB;border:1px dashed #E5E7EB;flex-shrink:0"></div>`;
         } else {
-          html += `<div title="Sıra ${ri+1}, Sütun ${ci+1} — Kovan ekle"
+          html += `<div title="Sıra ${satirEtiket(r,ROWS)}, Sütun ${sutunEtiket(c,COLS)} — Kovan ekle"
             onclick="krokidenKovanEkle(${r},${c})"
             style="width:24px;height:36px;border-radius:4px;background:#F9FAFB;border:1.5px dashed #D1D5DB;
             cursor:pointer;flex-shrink:0;transition:background .15s"
             onmouseover="this.style.background='#FEF3C7'" onmouseout="this.style.background='#F9FAFB'"></div>`;
         }
       }
-    });
+    }
     html += `</div>`;
-  });
+  }
   html += `</div>`;
 
   if (mod === 'toplu') { el.innerHTML = html; return; }
@@ -4462,29 +4450,28 @@ function renderQueenKroki() {
   const el = $("queen-grid");
   if (!el) return;
   let html = `<div style="display:flex;flex-direction:column;gap:6px;min-width:${QCOLS*28+24}px">`;
-  const { rowSeq, colSeq } = krokiSiralama(QROWS, QCOLS);
   html += `<div style="display:flex;gap:4px;padding-left:22px">`;
-  colSeq.forEach((c, ci) => {
-    html += `<div style="width:24px;text-align:center;font-size:9px;color:var(--gray);flex-shrink:0">${ci+1}</div>`;
-  });
+  for (let c = QCOLS-1; c >= 0; c--) {
+    html += `<div style="width:24px;text-align:center;font-size:9px;color:var(--gray);flex-shrink:0">${sutunEtiket(c,QCOLS)}</div>`;
+  }
   html += `</div>`;
-  rowSeq.forEach((r, ri) => {
+  for (let r = 0; r < QROWS; r++) {
     html += `<div style="display:flex;gap:4px;align-items:center">`;
-    html += `<span style="font-size:10px;font-weight:700;color:var(--brown2);width:18px;flex-shrink:0">${ri+1}</span>`;
-    colSeq.forEach((c, ci) => {
+    html += `<span style="font-size:10px;font-weight:700;color:var(--brown2);width:18px;flex-shrink:0">${satirEtiket(r,QROWS)}</span>`;
+    for (let c = QCOLS-1; c >= 0; c--) {
       const hive = qhiveAtPos(r, c);
       if (hive) {
         const isSecili = hive.id === queenSeciliHiveId;
         html += krokiHucreHTML(hive, isSecili);
       } else {
-        html += `<div onclick="queendenKovanEkle(${r},${c})" title="Sıra ${ri+1}, Sütun ${ci+1}"
+        html += `<div onclick="queendenKovanEkle(${r},${c})" title="Sıra ${satirEtiket(r,QROWS)}, Sütun ${sutunEtiket(c,QCOLS)}"
           style="width:24px;height:36px;border-radius:4px;background:#FFF9E6;border:1.5px dashed var(--amber3);
           cursor:pointer;flex-shrink:0;transition:background .15s"
           onmouseover="this.style.background='#FEF3C7'" onmouseout="this.style.background='#FFF9E6'"></div>`;
       }
-    });
+    }
     html += `</div>`;
-  });
+  }
   html += `</div>`;
   el.innerHTML = html;
 }
