@@ -900,30 +900,45 @@ function setKayitModu(aktif) {
   $("btn-login").textContent = aktif ? "← Geri" : "Giriş Yap";
 }
 
-$("btn-login").onclick = async () => {
-  if (_kayitModu) { setKayitModu(false); return; }
-  const e = $("auth-email").value.trim(), p = $("auth-pass").value;
-  if (!e || !p) { showAuthError("auth/invalid-email"); return; }
-  try {
-    await signInWithEmailAndPassword(auth, e, p);
-  } catch(err) { showAuthError(err.code); }
-};
-
-$("btn-register").onclick = async () => {
-  if (!_kayitModu) { setKayitModu(true); $("auth-isletme").focus(); return; }
-  const e = $("auth-email").value.trim();
-  const p = $("auth-pass").value;
-  const isletmeAd = $("auth-isletme").value.trim();
-  if (!isletmeAd) { showAuthError("isletme-bos"); return; }
-  if (!e) { showAuthError("auth/invalid-email"); return; }
-  if (p.length < 6) { showAuthError("weak-password"); return; }
-  try {
-    const cred = await createUserWithEmailAndPassword(auth, e, p);
-    const uid = cred.user.uid;
-    await setDoc(doc(db, `users/${uid}/ayarlar/genel`), { isletmeAd, sahipEmail: e }, { merge: true });
-    await setDoc(doc(db, "admin_isletmeler", uid), { ad: isletmeAd, email: e, sahipUid: uid });
-  } catch(err) { showAuthError(err.code); }
-};
+function resetAuthScreen() {
+  _kayitModu = false;
+  $("auth-screen").innerHTML = `
+    <div class="auth-card">
+      <div class="auth-logo">🐝</div>
+      <h1 class="auth-title">Dr. Arıcı</h1>
+      <p class="auth-sub">Kovan Yönetim Sistemi</p>
+      <div id="auth-error" class="auth-error" style="display:none"></div>
+      <input id="auth-email" class="input" type="email" placeholder="E-posta" autocomplete="email">
+      <input id="auth-pass" class="input" type="password" placeholder="Şifre" autocomplete="current-password">
+      <input id="auth-isletme" class="input" type="text" placeholder="İşletme Adı (kayıt için)" style="display:none">
+      <button class="btn btn-primary" id="btn-login">Giriş Yap</button>
+      <button class="btn btn-secondary" id="btn-register">Hesap oluştur</button>
+    </div>`;
+  $("btn-login").onclick = async () => {
+    if (_kayitModu) { setKayitModu(false); return; }
+    const e = $("auth-email").value.trim(), p = $("auth-pass").value;
+    if (!e || !p) { showAuthError("auth/invalid-email"); return; }
+    try {
+      await signInWithEmailAndPassword(auth, e, p);
+    } catch(err) { showAuthError(err.code); }
+  };
+  $("btn-register").onclick = async () => {
+    if (!_kayitModu) { setKayitModu(true); $("auth-isletme").focus(); return; }
+    const e = $("auth-email").value.trim();
+    const p = $("auth-pass").value;
+    const isletmeAd = $("auth-isletme").value.trim();
+    if (!isletmeAd) { showAuthError("isletme-bos"); return; }
+    if (!e) { showAuthError("auth/invalid-email"); return; }
+    if (p.length < 6) { showAuthError("weak-password"); return; }
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, e, p);
+      const uid = cred.user.uid;
+      await setDoc(doc(db, `users/${uid}/ayarlar/genel`), { isletmeAd, sahipEmail: e }, { merge: true });
+      await setDoc(doc(db, "admin_isletmeler", uid), { ad: isletmeAd, email: e, sahipUid: uid });
+    } catch(err) { showAuthError(err.code); }
+  };
+}
+resetAuthScreen();
 $("btn-logout").onclick = () => {
   [_unsubAyarlar,_unsubGelir,_unsubHives,_unsubSchedules,_unsubRecords,_unsubGecmis,window._unsubHatir].forEach(u=>u&&u());
   signOut(auth);
@@ -969,8 +984,10 @@ onAuthStateChanged(auth, async (user) => {
         const mevcutDoc = adminSnap.docs.find(d => d.id === user.uid);
         if (mevcutDoc?.data()?.askida === true) {
           await signOut(auth);
-          $("auth-error").textContent = "⏸️ Hesabınız askıya alınmıştır. Lütfen yönetici ile iletişime geçin.";
-          $("auth-error").style.display = "block";
+          setTimeout(() => {
+            $("auth-error").textContent = "⏸️ Hesabınız askıya alınmıştır. Lütfen yönetici ile iletişime geçin.";
+            $("auth-error").style.display = "block";
+          }, 50);
           return;
         }
         if (!mevcutDoc) {
@@ -986,6 +1003,7 @@ onAuthStateChanged(auth, async (user) => {
     }
   } else {
     activeIsletmeId = null;
+    resetAuthScreen();
     $("auth-screen").style.display = "flex";
     $("app").style.display = "none";
   }
