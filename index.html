@@ -585,7 +585,11 @@
 <div class="modal-overlay" id="modal-hive">
   <div class="modal">
     <div class="modal-handle"></div>
-    <div class="modal-title" id="hive-modal-title">🐝 Yeni Kovan</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div class="modal-title" id="hive-modal-title" style="margin-bottom:0">🐝 Yeni Kovan</div>
+      <button onclick="closeModal('modal-hive')"
+        style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--gray);padding:6px 10px;flex-shrink:0">✕</button>
+    </div>
     <div class="field">
       <label>Kovan Numarası *</label>
       <input class="input" id="hive-name" type="number" min="1" placeholder="1">
