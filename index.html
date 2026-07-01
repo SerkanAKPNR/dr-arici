@@ -2551,9 +2551,9 @@ function renderKovanDetayTam() {
               <button onclick="hiveNotSilDetayTam('${hive.id}',${gercekIdx})" style="background:none;border:none;color:var(--gray);cursor:pointer;font-size:13px;padding:0 4px">🗑️</button>
             </div>
           </div>
-          ${kalip ? `<div style="font-size:11px;color:var(--amber);margin-bottom:4px">${kalip.ikon} ${kalip.ad} ${tamamlandi ? '✅' : gecti ? '⚠️ Süresi geçti' : ''}</div>` : ''}
+          ${kalip ? `<div style="font-size:11px;color:var(--amber);margin-bottom:4px">${kalip.ikon} ${kalip.ad} ${tamamlandi ? '✅' : gecti ? '⚠️ Süresi geçti' : ''}</div>` : n.kalip ? `<div style="font-size:11px;color:var(--gray);margin-bottom:4px">🔕 Şablon silinmiş ${tamamlandi ? '✅' : ''}</div>` : ''}
           <div style="font-size:14px;color:var(--brown2);${tamamlandi ? 'text-decoration:line-through;opacity:0.6' : ''}">${n.metin}</div>
-          ${kalip && !tamamlandi ? `
+          ${n.kalip && !tamamlandi ? `
           <div style="display:flex;gap:6px;margin-top:6px">
             <button onclick="detayTamNotTamamla('${hive.id}',${gercekIdx})"
               style="flex:1;padding:5px;background:#22C55E;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit;font-weight:600">✅ Tamamlandı</button>
@@ -3852,7 +3852,7 @@ function krokiHucreHTML(hive, isSecili) {
   let inner = '';
   if (floors === 2) inner = '<div style="position:absolute;top:12px;left:0;right:0;height:2px;background:rgba(255,255,255,0.7)"></div>';
   if (floors >= 3) inner = '<div style="position:absolute;top:12px;left:0;right:0;height:2px;background:rgba(255,255,255,0.7)"></div><div style="position:absolute;top:24px;left:0;right:0;height:2px;background:rgba(255,255,255,0.7)"></div>';
-  const aktifKalipNot = (hive.notlar||[]).some(n => n.kalip && !n.tamamlandi);
+  const aktifKalipNot = (hive.notlar||[]).some(n => n.kalip && !n.tamamlandi && getKaliplar().some(k => k.id === n.kalip));
   const zil = aktifKalipNot ? `<div onclick="event.stopPropagation();kovanDetayAc('${hive.id}')" style="position:absolute;top:2px;right:2px;font-size:7px;line-height:1;cursor:pointer">🔔</div>` : '';
   return `<div onclick="selectHiveFromKroki('${hive.id}')" style="width:24px;height:36px;border-radius:4px;position:relative;overflow:hidden;background:${color};border:${border};box-shadow:${shadow};cursor:pointer;flex-shrink:0;display:flex;align-items:flex-end;justify-content:center;font-size:10px;color:#fff;font-weight:800;transform:${scale};transition:all .15s;padding-bottom:2px">${inner}${zil}${hive.name}</div>`;
 }
