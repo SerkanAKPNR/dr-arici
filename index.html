@@ -2658,7 +2658,6 @@ window.duzenleNotSil = async function(idx) {
   renderDuzenleNotlar();
 };
 window.renderDuzenleNotlar = renderDuzenleNotlar;
-window.duzenleNotSil = duzenleNotSil;
 
 window.notTamamla = async function(idx) {
   const hive = hives.find(h => h.id === editingHiveId);
@@ -4299,7 +4298,6 @@ async function kovanTasiKaydet() {
 }
 window.kovanTasiKaydet = kovanTasiKaydet;
 
-window.kovanTasi = kovanTasi;
 
 window.verileriSilOnay = function() {
   $("sifre-modal-baslik").textContent = "🗑️ Verileri Sil";
@@ -4661,15 +4659,12 @@ window.kalipSec = function(id) {
   });
 };
 window.hiveNotKaydet = hiveNotKaydet;
-window.hiveNotSil = hiveNotSil;
 
 
 window.renderHiveNotes = renderHiveNotes;
 window.renderGelir = renderGelir;
 window.updateFabVisibility = updateFabVisibility;
 window.renderHives = renderHives;
-window.isletmeyeGir = isletmeyeGir;
-window.yeniIsletmeEkle = yeniIsletmeEkle;
 window.gelirKaydet = gelirKaydet;
 window.gelirSil = gelirSil;
 window.yedekAlExcel = yedekAlExcel;
@@ -4679,15 +4674,12 @@ window.getTabOrder = getTabOrder;
 window.renderTopluHiveList = renderTopluHiveList;
 window.renderTopluMiniKroki = renderTopluMiniKroki;
 window.closeModal = closeModal;
-window.deleteRecord = deleteRecord;
 window.grupEkle = grupEkle;
 window.grupSil = grupSil;
 window.renderGrupListesi = renderGrupListesi;
 window.populateGroupSelect = populateGroupSelect;
 window.renderHome = renderHome;
 window.homeGrupAc = homeGrupAc;
-window.kovanIslemModal = kovanIslemModal;
-window.kovanIslemOnayla = kovanIslemOnayla;
 window.renderGecmis = renderGecmis;
 window.loadKovanGecmis = loadKovanGecmis;
 window.toggleTopluPanel = toggleTopluPanel;
@@ -4699,9 +4691,6 @@ window.topluToggleKovan = topluToggleKovan;
 window.saveTabOrder = saveTabOrder;
 window.saveFramesSetting = saveFramesSetting;
 window.toggleRepeat = toggleRepeat;
-window.selectHive = selectHive;
-window.selectPos = selectPos;
-window.pickColor = pickColor;
 window.toggleTopluPanel = toggleTopluPanel;
 </script>
 </body>
