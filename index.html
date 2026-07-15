@@ -224,6 +224,7 @@
       <div class="header-logo">
         <span style="font-size:28px">🐝</span>
         <span>Dr. Arıcı</span>
+        <span id="offline-badge" style="display:none;font-size:11px;font-weight:700;background:#FEE2E2;color:#991B1B;padding:2px 8px;border-radius:20px;margin-left:6px">⚡ Çevrimdışı</span>
       </div>
       <button class="header-logout" id="btn-logout">Çıkış</button>
     </div>
@@ -484,6 +485,7 @@
 
       <div class="sec-title">Yedekleme</div>
       <div style="background:var(--white);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow)">
+        <div id="yedek-durum" style="font-size:13px;margin-bottom:12px;padding:8px 10px;border-radius:8px;text-align:center"></div>
         <div style="font-size:12px;color:var(--gray);margin-bottom:12px">Tüm veriler (kovanlar, takvim, kayıtlar, gruplar, tipler) JSON ve Excel olarak indirilir. Geri yüklemek için JSON dosyasını yükleyin.</div>
         <div style="display:flex;flex-direction:column;gap:8px">
           <button onclick="yedekAl()"
@@ -524,6 +526,11 @@
   </div>
 
   <div class="content" id="tab-kroki" style="display:none">
+    <div style="display:flex;gap:6px;margin-bottom:10px">
+      <input id="kroki-ara" class="input" type="number" min="1" placeholder="🔍 Kovan no ile bul..." style="flex:1;margin-bottom:0"
+        onkeydown="if(event.key==='Enter')krokidaKovanBul()">
+      <button onclick="krokidaKovanBul()" class="btn btn-primary" style="flex-shrink:0;width:auto;padding:0 16px">Bul</button>
+    </div>
     <div style="font-size:13px;color:var(--gray);margin-bottom:10px;text-align:center">Boş hücreye tıklayarak kovan yerleştirebilirsiniz</div>
     <!-- Ok kontrol paneli -->
     <div id="kroki-ok-panel" style="display:none;background:var(--white);border-radius:var(--radius);padding:12px;margin-bottom:10px;box-shadow:var(--shadow)">
@@ -809,7 +816,8 @@ import {
   signOut, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import {
-  getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, setDoc,
+  getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
+  collection, addDoc, getDocs, updateDoc, deleteDoc, setDoc,
   doc, query, where, orderBy, onSnapshot, serverTimestamp, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
@@ -824,7 +832,16 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = getFirestore(app);
+// Çevrimdışı önbellek: internet olmasa da veriler görünür, bağlanınca senkronlanır
+let db;
+try {
+  db = initializeFirestore(app, {
+    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+  });
+} catch (e) {
+  // Bazı tarayıcılarda (gizli mod, eski sürüm) persistence açılamayabilir — normal moda düş
+  db = getFirestore(app);
+}
 
 // ─── STATE ──────────────────────────────────────────────────────
 let currentUser = null;
@@ -2087,6 +2104,7 @@ function renderSettings() {
   const qrowsEl = $("set-qrows"); if (qrowsEl) qrowsEl.value = QROWS;
   const qcolsEl = $("set-qcols"); if (qcolsEl) qcolsEl.value = QCOLS;
   renderYonButonlari();
+  renderYedekDurum();
   // Butonları her seferinde yeniden bağla
   const btnCikis = $("btn-cikis-yap");
   if (btnCikis) btnCikis.onclick = () => {
@@ -3908,7 +3926,7 @@ function krokiHucreHTML(hive, isSecili) {
   if (floors >= 3) inner = '<div style="position:absolute;top:12px;left:0;right:0;height:2px;background:rgba(255,255,255,0.7)"></div><div style="position:absolute;top:24px;left:0;right:0;height:2px;background:rgba(255,255,255,0.7)"></div>';
   const aktifKalipNot = (hive.notlar||[]).some(n => n.kalip && !n.tamamlandi && getKaliplar().some(k => k.id === n.kalip));
   const zil = aktifKalipNot ? `<div onclick="event.stopPropagation();kovanDetayAc('${hive.id}')" style="position:absolute;top:2px;right:2px;font-size:7px;line-height:1;cursor:pointer">🔔</div>` : '';
-  return `<div onclick="selectHiveFromKroki('${hive.id}')" style="width:24px;height:36px;border-radius:4px;position:relative;overflow:hidden;background:${color};border:${border};box-shadow:${shadow};cursor:pointer;flex-shrink:0;display:flex;align-items:flex-end;justify-content:center;font-size:10px;color:#fff;font-weight:800;transform:${scale};transition:all .15s;padding-bottom:2px">${inner}${zil}${hive.name}</div>`;
+  return `<div data-kroki-hive="${hive.id}" onclick="selectHiveFromKroki('${hive.id}')" style="width:24px;height:36px;border-radius:4px;position:relative;overflow:hidden;background:${color};border:${border};box-shadow:${shadow};cursor:pointer;flex-shrink:0;display:flex;align-items:flex-end;justify-content:center;font-size:10px;color:#fff;font-weight:800;transform:${scale};transition:all .15s;padding-bottom:2px">${inner}${zil}${hive.name}</div>`;
 }
 
 
@@ -3999,6 +4017,30 @@ window.selectHiveFromKroki = function(id) {
   kovanDetayAc(id);
 };
 
+window.krokidaKovanBul = function() {
+  const input = $("kroki-ara");
+  const q = (input?.value || "").trim();
+  if (!q) return;
+  const hedef = hives.find(h => String(h.name) === q);
+  if (!hedef) { showToast(`"${q}" numaralı kovan bulunamadı`); return; }
+  const el = document.querySelector(`[data-kroki-hive="${hedef.id}"]`);
+  if (!el) { showToast("Kovan krokide görünmüyor"); return; }
+  // Yatay konumuna kaydır
+  el.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+  // Kısa süreli vurgulama
+  const eskiZindex = el.style.zIndex;
+  el.style.zIndex = "5";
+  el.animate([
+    { boxShadow: "0 0 0 3px var(--brown), 0 4px 12px rgba(0,0,0,.3)", transform: "scale(1.6)" },
+    { boxShadow: "0 0 0 6px #FCD34D, 0 4px 16px rgba(0,0,0,.4)", transform: "scale(1.9)" },
+    { boxShadow: "0 0 0 3px var(--brown), 0 4px 12px rgba(0,0,0,.3)", transform: "scale(1.6)" },
+    { boxShadow: "0 0 0 6px #FCD34D, 0 4px 16px rgba(0,0,0,.4)", transform: "scale(1.9)" },
+    { boxShadow: "0 2px 6px rgba(0,0,0,.15)", transform: "scale(1)" }
+  ], { duration: 2000, easing: "ease-in-out" });
+  setTimeout(() => { el.style.zIndex = eskiZindex; }, 2000);
+  input.value = "";
+};
+
 
 
 // ─── SWIPE ───────────────────────────────────────────────────────
@@ -4086,6 +4128,16 @@ window.testSil = testSil;
 // ─── GERİ TUŞU ───────────────────────────────────────────────────
 history.pushState({ tab: "home" }, "", window.location.href);
 
+// ─── ÇEVRİMDIŞI DURUM GÖSTERGESİ ─────────────────────────────────
+function guncelleOnlineDurum() {
+  const badge = $("offline-badge");
+  if (!badge) return;
+  badge.style.display = navigator.onLine ? "none" : "inline-block";
+}
+window.addEventListener("online", () => { guncelleOnlineDurum(); showToast("✓ İnternet bağlantısı geri geldi, senkronlanıyor"); });
+window.addEventListener("offline", () => { guncelleOnlineDurum(); showToast("⚡ Çevrimdışı — değişiklikler bağlanınca kaydedilecek"); });
+guncelleOnlineDurum();
+
 window.addEventListener("popstate", function() {
   if (activeTab === "home") {
     if (confirm("Uygulamadan çıkmak istiyor musunuz?")) {
@@ -4121,6 +4173,7 @@ async function yedekAl() {
   a.download = `dr-arici-yedek-${new Date().toISOString().split("T")[0]}.json`;
   a.click();
   URL.revokeObjectURL(url);
+  yedekTarihiKaydet();
   showToast("✓ JSON yedek indirildi");
 }
 
@@ -4173,8 +4226,41 @@ async function yedekAlExcel() {
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(gecSatir), "Geçmiş");
 
   XLSX.writeFile(wb, `dr-arici-yedek-${tarih}.xlsx`);
+  yedekTarihiKaydet();
   showToast("✓ Excel yedek indirildi");
 }
+
+function yedekAnahtari() {
+  return `son_yedek_${activeIsletmeId || (currentUser && currentUser.uid) || "default"}`;
+}
+function yedekTarihiKaydet() {
+  localStorage.setItem(yedekAnahtari(), new Date().toISOString());
+  renderYedekDurum();
+}
+function renderYedekDurum() {
+  const el = $("yedek-durum");
+  if (!el) return;
+  const son = localStorage.getItem(yedekAnahtari());
+  if (!son) {
+    el.style.background = "#FEF3C7";
+    el.style.color = "#92400E";
+    el.innerHTML = "⚠️ Henüz yedek alınmadı. Verilerini güvence altına almak için yedek al.";
+    return;
+  }
+  const gun = Math.floor((Date.now() - new Date(son).getTime()) / 86400000);
+  const tarihStr = new Date(son).toLocaleDateString("tr-TR", { day:"numeric", month:"long", year:"numeric" });
+  let ne, bg, renk;
+  if (gun === 0) ne = "bugün";
+  else if (gun === 1) ne = "dün";
+  else ne = `${gun} gün önce`;
+  if (gun <= 7) { bg = "#DCFCE7"; renk = "#166534"; }
+  else if (gun <= 30) { bg = "#FEF3C7"; renk = "#92400E"; }
+  else { bg = "#FEE2E2"; renk = "#991B1B"; }
+  el.style.background = bg;
+  el.style.color = renk;
+  el.innerHTML = `${gun > 30 ? '⚠️ ' : '📦 '}Son yedek: <strong>${ne}</strong> (${tarihStr})${gun > 30 ? ' — yeni yedek almanız önerilir' : ''}`;
+}
+window.renderYedekDurum = renderYedekDurum;
 
 async function yedekYukle(event) {
   const file = event.target.files[0];
