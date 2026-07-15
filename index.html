@@ -883,6 +883,7 @@ const HIVE_COLORS = [
 
 // ─── UTILS ──────────────────────────────────────────────────────
 function $(id) { return document.getElementById(id); }
+function esc(s) { return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 function showToast(msg) {
   const t = $("toast"); t.textContent = msg; t.classList.add("show");
   setTimeout(() => t.classList.remove("show"), 2400);
@@ -1278,7 +1279,7 @@ function updateStats() {
   const tiplerEl = $("stats-tipler");
   if (tiplerEl) {
     // Toplam kovan her zaman ilk
-    let html = `<div class="stat-card" style="background:rgba(255,255,255,.2);color:#fff" onclick="activeGrupFilter=null;switchTab('hives')">
+    let html = `<div class="stat-card" style="background:rgba(255,255,255,.2);color:#fff" onclick="tumKovanlaraGit()">
       <div class="stat-val">${hives.length}</div><div class="stat-lbl">Toplam</div>
     </div>`;
     tipler.forEach(tip => {
@@ -1581,7 +1582,7 @@ function takvimGunDetayIcerik(tarihStr) {
         <div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px;background:var(--amber)"></div>
         <div style="flex:1">
           <div style="font-size:11px;color:var(--amber);font-weight:600;margin-bottom:2px">${kalip?kalip.ikon+' '+kalip.ad:'📝 Not'} · ${hive.name}. Kovan</div>
-          <div style="font-size:13px;color:var(--brown)">${not.metin}</div>
+          <div style="font-size:13px;color:var(--brown)">${esc(not.metin)}</div>
         </div>
       </div>
       <div style="display:flex;gap:6px">
@@ -1600,7 +1601,7 @@ function takvimGunDetayIcerik(tarihStr) {
         <div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px;background:#3B82F6"></div>
         <div style="flex:1">
           <div style="font-size:11px;color:#3B82F6;font-weight:600;margin-bottom:2px">🔔 Genel Hatırlatma</div>
-          <div style="font-size:13px;color:var(--brown)">${h.metin}</div>
+          <div style="font-size:13px;color:var(--brown)">${esc(h.metin)}</div>
         </div>
       </div>
       <div style="display:flex;gap:6px">
@@ -1630,7 +1631,7 @@ function renderTakvimGunDetay() {
 }
 
 window.takvimSchedTamamla = async function(id) {
-  await updateDoc(doc(db, `users/${currentUser.uid}/takvim/${id}`), { done: true });
+  await updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/takvim/${id}`), { done: true });
   showToast("✅ Tamamlandı!");
   await loadSchedules();
   renderTakvimGunDetay();
@@ -1644,7 +1645,7 @@ window.takvimSchedErtele = async function(id) {
   if (!s) return;
   const yeniT = new Date(s.date + 'T00:00:00');
   yeniT.setDate(yeniT.getDate() + parseInt(gun));
-  await updateDoc(doc(db, `users/${currentUser.uid}/takvim/${id}`), { date: yeniT.toISOString().split("T")[0] });
+  await updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/takvim/${id}`), { date: yeniT.toISOString().split("T")[0] });
   showToast(`⏰ ${gun} gün ertelendi`);
   await loadSchedules();
   renderTakvimGunDetay();
@@ -1736,7 +1737,7 @@ function renderSchedule() {
 window.toggleSched = async function(id) {
   const s = schedules.find(x => x.id === id);
   if (!s) return;
-  await updateDoc(doc(db, `users/${currentUser.uid}/takvim/${id}`), { done: !s.done });
+  await updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/takvim/${id}`), { done: !s.done });
   showToast(s.done ? "Görev açıldı" : "Görev tamamlandı ✓");
   loadSchedules();
 };
@@ -1772,7 +1773,7 @@ function renderRecords() {
 
 window.deleteRecord = async function(id) {
   if (!confirm("Bu kaydı silmek istiyor musun?")) return;
-  await deleteDoc(doc(db, `users/${currentUser.uid}/kayitlar/${id}`));
+  await deleteDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kayitlar/${id}`));
   showToast("Kayıt silindi");
   loadRecords();
 };
@@ -2566,7 +2567,7 @@ function renderKovanDetayTam() {
             </div>
           </div>
           ${kalip ? `<div style="font-size:11px;color:var(--amber);margin-bottom:4px">${kalip.ikon} ${kalip.ad} ${tamamlandi ? '✅' : gecti ? '⚠️ Süresi geçti' : ''}</div>` : n.kalip ? `<div style="font-size:11px;color:var(--gray);margin-bottom:4px">🔕 Şablon silinmiş ${tamamlandi ? '✅' : ''}</div>` : ''}
-          <div style="font-size:14px;color:var(--brown2);${tamamlandi ? 'text-decoration:line-through;opacity:0.6' : ''}">${n.metin}</div>
+          <div style="font-size:14px;color:var(--brown2);${tamamlandi ? 'text-decoration:line-through;opacity:0.6' : ''}">${esc(n.metin)}</div>
           ${n.kalip && !tamamlandi ? `
           <div style="display:flex;gap:6px;margin-top:6px">
             <button onclick="detayTamNotTamamla('${hive.id}',${gercekIdx})"
@@ -2655,7 +2656,7 @@ function renderDuzenleNotlar(hive) {
         <button onclick="duzenleNotSil(${gercekIdx})" style="background:none;border:none;color:var(--gray);cursor:pointer;font-size:13px;padding:0">🗑️</button>
       </div>
       ${kalip ? `<div style="font-size:11px;color:var(--amber);margin-bottom:4px">${kalip.ikon} ${kalip.ad} ${tamamlandi ? '✅' : gecti ? '⚠️ Süresi geçti' : ''}</div>` : ''}
-      <div style="font-size:13px;color:var(--brown2);${tamamlandi ? 'text-decoration:line-through;opacity:0.6' : ''}">${n.metin}</div>
+      <div style="font-size:13px;color:var(--brown2);${tamamlandi ? 'text-decoration:line-through;opacity:0.6' : ''}">${esc(n.metin)}</div>
       ${kalip && !tamamlandi ? `
       <div style="display:flex;gap:6px;margin-top:6px">
         <button onclick="notTamamla(${gercekIdx})"
@@ -2739,7 +2740,7 @@ function renderHiveNotes(h) {
     <div style="display:flex;gap:8px;align-items:flex-start">
       <div style="flex:1;cursor:pointer" onclick="kovanDetayAc('${h.id}')">
         <div style="font-size:11px;color:var(--amber);font-weight:600;margin-bottom:2px">${sonNot.tarih} ${notlar.length > 1 ? `<span style="color:var(--gray)">(+${notlar.length-1} not daha)</span>` : ''}</div>
-        <div style="font-size:13px;color:var(--brown2);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${sonNot.metin}${sonNot.bitisT && !sonNot.tamamlandi ? ` <span style="font-size:11px;color:var(--amber)">(${new Date(sonNot.bitisT).toLocaleDateString('tr-TR',{day:'numeric',month:'short'})})</span>` : ''}</div>
+        <div style="font-size:13px;color:var(--brown2);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(sonNot.metin)}${sonNot.bitisT && !sonNot.tamamlandi ? ` <span style="font-size:11px;color:var(--amber)">(${new Date(sonNot.bitisT).toLocaleDateString('tr-TR',{day:'numeric',month:'short'})})</span>` : ''}</div>
       </div>
       ${!gorevAktif ? `<button onclick="notEkleAc('${h.id}')" style="font-size:12px;color:var(--amber);background:none;border:1px dashed var(--amber);border-radius:8px;padding:4px 8px;cursor:pointer;font-family:inherit;flex-shrink:0">+</button>` : ''}
     </div>
@@ -3440,7 +3441,7 @@ function renderHome() {
         return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--gray2)">
           <div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:${gecti?'#EF4444':bugunMu?'var(--amber)':'#3B82F6'}"></div>
           <div style="flex:1">
-            <div style="font-size:13px;color:var(--brown)">${h.metin}</div>
+            <div style="font-size:13px;color:var(--brown)">${esc(h.metin)}</div>
             <div style="font-size:11px;color:${gecti?'#EF4444':'var(--gray)'}">${gecti?'⚠️ Gecikmiş · ':bugunMu?'📅 Bugün · ':''}${tarih.toLocaleDateString('tr-TR',{day:'numeric',month:'short'})}</div>
           </div>
           <button onclick="hatirlatmaTamamlaOnay('${h.id}')" style="background:none;border:none;color:#22C55E;cursor:pointer;font-size:18px">✅</button>
@@ -3683,7 +3684,7 @@ async function topluKaydet() {
       while (kats.length < floors) kats.push(def);
       // En üst kata ekle (son index = en üst kat)
       kats[kats.length - 1] = (kats[kats.length - 1] || 0) + sayi;
-      batch.push(updateDoc(doc(db, `users/${currentUser.uid}/kovanllar/${hiveId}`), { frames: kats }));
+      batch.push(updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${hiveId}`), { frames: kats }));
     });
     await Promise.all(batch);
     showToast(`✓ ${topluSeciliKovanlar.size} kovana ${sayi} çıta eklendi`);
@@ -4182,33 +4183,36 @@ async function yedekYukle(event) {
     const veri = JSON.parse(text);
     if (!veri.kovanllar || !veri.versiyon) { showToast("⚠️ Geçersiz yedek dosyası!"); return; }
 
+    // Aktif işletmeye yaz (admin başka işletmedeyken kendi verisini bozmasın)
+    const hedefUid = activeIsletmeId || currentUser.uid;
+
     // Firestore'a yaz
     const batch = [];
 
     // Kovanları sil ve yeniden yaz
     const kovSnap = await getDocs(col("kovanllar"));
-    kovSnap.docs.forEach(d => batch.push(deleteDoc(doc(db, `users/${currentUser.uid}/kovanllar/${d.id}`))));
+    kovSnap.docs.forEach(d => batch.push(deleteDoc(doc(db, `users/${hedefUid}/kovanllar/${d.id}`))));
     await Promise.all(batch);
 
     const batch2 = veri.kovanllar.map(h => {
       const { id, ...data } = h;
-      return setDoc(doc(db, `users/${currentUser.uid}/kovanllar/${id}`), data);
+      return setDoc(doc(db, `users/${hedefUid}/kovanllar/${id}`), data);
     });
 
     // Takvim
     const takSnap = await getDocs(col("takvim"));
-    takSnap.docs.forEach(d => batch2.push(deleteDoc(doc(db, `users/${currentUser.uid}/takvim/${d.id}`))));
-    veri.takvim?.forEach(s => { const { id, ...data } = s; batch2.push(setDoc(doc(db, `users/${currentUser.uid}/takvim/${id}`), data)); });
+    takSnap.docs.forEach(d => batch2.push(deleteDoc(doc(db, `users/${hedefUid}/takvim/${d.id}`))));
+    veri.takvim?.forEach(s => { const { id, ...data } = s; batch2.push(setDoc(doc(db, `users/${hedefUid}/takvim/${id}`), data)); });
 
     // Kayıtlar
     const kaySnap = await getDocs(col("kayitlar"));
-    kaySnap.docs.forEach(d => batch2.push(deleteDoc(doc(db, `users/${currentUser.uid}/kayitlar/${d.id}`))));
-    veri.kayitlar?.forEach(r => { const { id, ...data } = r; batch2.push(setDoc(doc(db, `users/${currentUser.uid}/kayitlar/${id}`), data)); });
+    kaySnap.docs.forEach(d => batch2.push(deleteDoc(doc(db, `users/${hedefUid}/kayitlar/${d.id}`))));
+    veri.kayitlar?.forEach(r => { const { id, ...data } = r; batch2.push(setDoc(doc(db, `users/${hedefUid}/kayitlar/${id}`), data)); });
 
     // Geçmiş
     const gecSnap = await getDocs(col("kovan_gecmis"));
-    gecSnap.docs.forEach(d => batch2.push(deleteDoc(doc(db, `users/${currentUser.uid}/kovan_gecmis/${d.id}`))));
-    veri.kovan_gecmis?.forEach(k => { const { id, ...data } = k; batch2.push(setDoc(doc(db, `users/${currentUser.uid}/kovan_gecmis/${id}`), data)); });
+    gecSnap.docs.forEach(d => batch2.push(deleteDoc(doc(db, `users/${hedefUid}/kovan_gecmis/${d.id}`))));
+    veri.kovan_gecmis?.forEach(k => { const { id, ...data } = k; batch2.push(setDoc(doc(db, `users/${hedefUid}/kovan_gecmis/${id}`), data)); });
 
     await Promise.all(batch2);
 
@@ -4621,6 +4625,11 @@ async function kaydirUygula(sira, yon) {
 
 // ─── GLOBAL EXPOSE ──────────────────────────────────────────────
 function temizleGrupFilter() { activeGrupFilter = null; renderHives(); }
+window.tumKovanlaraGit = function() {
+  activeGrupFilter = null;
+  switchTab("hives");
+};
+
 function filterByType(tip) {
   activeGrupFilter = null;
   switchTab("hives");
@@ -4683,7 +4692,7 @@ async function tumVeriyiSil() {
     const koleksiyonlar = ["kovanllar", "takvim", "kayitlar", "kovan_gecmis"];
     for (const kol of koleksiyonlar) {
       const snap = await getDocs(col(kol));
-      snap.docs.forEach(d => batch.push(deleteDoc(doc(db, `users/${currentUser.uid}/${kol}/${d.id}`))));
+      snap.docs.forEach(d => batch.push(deleteDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/${kol}/${d.id}`))));
     }
     await Promise.all(batch);
     // Yasaklı numaraları da sıfırla
