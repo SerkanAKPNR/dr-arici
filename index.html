@@ -2838,7 +2838,7 @@ window.notEkleAcNotlarModal = notEkleAcNotlarModal;
 
 async function hiveNotKaydet() {
   const metin = $("hive-not-text").value.trim();
-  if (!metin) { showToast("Not boş olamaz"); return; }
+  if (!metin && !seciliKalipId) { showToast("Not boş olamaz"); return; }
   const hive = hives.find(h => h.id === notEklenenHiveId);
   if (!hive) return;
   const notlar = [...(hive.notlar || [])];
@@ -2855,12 +2855,17 @@ async function hiveNotKaydet() {
     const tarih = new Date().toLocaleDateString("tr-TR", { day:"numeric", month:"long", year:"numeric" });
     const yeniNot = { metin, tarih };
     if (seciliKalipId) {
-      yeniNot.kalip = seciliKalipId;
       const kalip = getKaliplar().find(k => k.id === seciliKalipId);
       if (kalip && kalip.sure) {
+        // Süreli kalıp → hatırlatma görevi (zil + tamamla/ertele)
+        yeniNot.kalip = seciliKalipId;
         const bitis = new Date();
         bitis.setDate(bitis.getDate() + kalip.sure);
         yeniNot.bitisT = bitis.toISOString().split("T")[0];
+      } else if (kalip) {
+        // Süresiz kalıp → sıradan not; kalıp ikon/adını metnin başına ekle
+        const onek = `${kalip.ikon || ''} ${kalip.ad}`.trim();
+        yeniNot.metin = metin ? `${onek} — ${metin}` : onek;
       }
     }
     notlar.push(yeniNot);
@@ -3092,7 +3097,7 @@ function renderKalipListesi() {
       <span style="font-size:16px">${k.ikon||''}</span>
       <div style="flex:1">
         <div style="font-size:14px;color:var(--brown);font-weight:600">${k.ad}</div>
-        ${k.sure ? `<div style="font-size:11px;color:var(--gray)">${k.sure} gün sonra hatırlatır</div>` : ''}
+        ${k.sure ? `<div style="font-size:11px;color:var(--gray)">🔔 ${k.sure} gün sonra hatırlatır</div>` : `<div style="font-size:11px;color:var(--gray)">📝 Sıradan not (hatırlatma yok)</div>`}
       </div>
       <button onclick="kalipSil('${k.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:15px">🗑️</button>
     </div>`
