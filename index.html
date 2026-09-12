@@ -1453,7 +1453,7 @@ window.editHive = function(id) {
   openModal("modal-hive");
 };
 
-window.deleteHive = async function(id, durum, not) {
+window.deleteHive = async function(id, durum, not, neden) {
   const hive = hives.find(h => h.id === id);
   if (!hive) return;
   const num = parseInt(hive.name);
@@ -1464,6 +1464,7 @@ window.deleteHive = async function(id, durum, not) {
     ...hive,
     arsivDurum: durum,
     arsivNot: not || "",
+    arsivNeden: neden || "",
     arsivTarih: new Date().toISOString().split("T")[0],
     arsivAt: serverTimestamp(),
   });
@@ -2604,9 +2605,9 @@ function renderKovanDetayTam() {
       <button onclick="closeModal('modal-kovan-detay-tam');editHive('${hive.id}')"
         style="flex:1;padding:10px;border:1.5px solid var(--gray2);border-radius:10px;background:var(--white);cursor:pointer;font-size:13px;font-family:inherit;min-width:80px">✏️ Düzenle</button>
       ${activeTab==="kroki" ? `<button onclick="closeModal('modal-kovan-detay-tam');krokiTasiModuBaslat('${hive.id}')"
-        style="flex:1;padding:10px;border:1.5px solid var(--amber);border-radius:10px;background:var(--amber);color:#fff;cursor:pointer;font-size:13px;font-weight:700;font-family:inherit;min-width:80px">↔️ Taşı</button>` :
-      `<button onclick="closeModal('modal-kovan-detay-tam');kovanIslemModal('${hive.id}')"
-        style="flex:1;padding:10px;border:1.5px solid #FEE2E2;border-radius:10px;background:#FFF5F5;cursor:pointer;font-size:13px;color:var(--red);font-family:inherit;min-width:80px">⬇️ İşlem</button>`}
+        style="flex:1;padding:10px;border:1.5px solid var(--amber);border-radius:10px;background:var(--amber);color:#fff;cursor:pointer;font-size:13px;font-weight:700;font-family:inherit;min-width:80px">↔️ Taşı</button>` : ''}
+      <button onclick="closeModal('modal-kovan-detay-tam');kovanIslemModal('${hive.id}')"
+        style="flex:1;padding:10px;border:1.5px solid #FEE2E2;border-radius:10px;background:#FFF5F5;cursor:pointer;font-size:13px;color:var(--red);font-family:inherit;min-width:80px">⬇️ İşlem</button>
     </div>
   `;
 }
@@ -2986,24 +2987,54 @@ function renderGecmis() {
   const durumLabel = { satildi: "Satıldı", "söndü": "Söndü", silindi: "Silindi" };
   const durumColor = { satildi: "var(--green2)", "söndü": "var(--red)", silindi: "var(--gray)" };
 
-  el.innerHTML = kovanGecmis.map(k => `
+  // Kayıp nedeni özeti (sadece "söndü" olanlar için — en çok neden kovan kaybettiğimizi gösterir)
+  const sonduler = kovanGecmis.filter(k => k.arsivDurum === "söndü" && k.arsivNeden);
+  let ozetHtml = "";
+  if (sonduler.length) {
+    const sayim = {};
+    sonduler.forEach(k => { sayim[k.arsivNeden] = (sayim[k.arsivNeden]||0) + 1; });
+    const siraliNedenler = Object.entries(sayim).sort((a,b) => b[1]-a[1]);
+    const maxSayi = siraliNedenler[0][1];
+    ozetHtml = `
+    <div style="background:var(--white);border-radius:var(--radius);padding:14px;margin-bottom:14px;box-shadow:var(--shadow)">
+      <div style="font-size:13px;font-weight:700;color:var(--brown);margin-bottom:10px">💀 Kayıp Nedenleri (${sonduler.length} kovan)</div>
+      ${siraliNedenler.map(([neden,sayi]) => `
+        <div style="margin-bottom:7px">
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--brown2);margin-bottom:2px">
+            <span>${neden}</span><span style="font-weight:700">${sayi}</span>
+          </div>
+          <div style="background:var(--cream2);border-radius:6px;height:6px;overflow:hidden">
+            <div style="background:var(--red);height:100%;width:${(sayi/maxSayi*100)}%;border-radius:6px"></div>
+          </div>
+        </div>`).join("")}
+    </div>`;
+  }
+
+  el.innerHTML = ozetHtml + kovanGecmis.map(k => {
+    const detaylar = [];
+    if (k.queen) detaylar.push(`👑 ${esc(k.queen)}`);
+    if (k.breed) detaylar.push(`🧬 ${esc(k.breed)}`);
+    if (k.strength) detaylar.push(`💪 ${k.strength}/10`);
+    return `
     <div style="background:var(--white);border-radius:var(--radius);padding:14px;margin-bottom:10px;
                 box-shadow:var(--shadow);border-left:4px solid ${durumColor[k.arsivDurum]||'var(--gray2)'}">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
         <div class="hex-icon" style="background:${k.color||'#9CA3AF'};width:36px;height:31px;font-size:14px">🐝</div>
         <div style="flex:1">
           <div style="font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:var(--brown)">${k.name}. Kovan</div>
-          <div style="font-size:12px;color:var(--gray)">${k.type||''}</div>
+          <div style="font-size:12px;color:var(--gray)">${esc(k.type)||''}</div>
         </div>
         <span style="font-size:12px;font-weight:700;color:${durumColor[k.arsivDurum]||'var(--gray)'};
           background:var(--cream2);padding:3px 10px;border-radius:20px">
           ${durumIcon[k.arsivDurum]||''} ${durumLabel[k.arsivDurum]||k.arsivDurum}
         </span>
       </div>
+      ${k.arsivNeden ? `<div style="font-size:12px;color:var(--red);font-weight:600;margin-bottom:4px">⚠️ Neden: ${esc(k.arsivNeden)}</div>` : ''}
+      ${detaylar.length ? `<div style="font-size:12px;color:var(--gray);margin-bottom:6px;display:flex;gap:10px;flex-wrap:wrap">${detaylar.join('&nbsp;&nbsp;')}</div>` : ''}
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
         <div style="display:flex;gap:12px;font-size:12px;color:var(--gray)">
           <span>📅 ${k.arsivTarih||'—'}</span>
-          ${k.arsivNot ? `<span>📝 ${k.arsivNot}</span>` : ''}
+          ${k.arsivNot ? `<span>📝 ${esc(k.arsivNot)}</span>` : ''}
         </div>
         ${getBannedNumbers().includes(parseInt(k.name)) ?
           `<button onclick="numarayiSerbest('${k.name}')"
@@ -3012,24 +3043,32 @@ function renderGecmis() {
           </button>` : ''
         }
       </div>
-    </div>`).join("");
+    </div>`;
+  }).join("");
 }
 
 window.kovanIslemModal = function(id) {
   const hive = hives.find(h => h.id === id);
   if (!hive) return;
   $("kovan-islem-baslik").textContent = `${hive.name}. Kovan — İşlem`;
+  const nedenler = ["Varroa","Açlık","Kraliçesizlik","Hastalık","Yağma","Soğuk/Kış kaybı","Zehirlenme","Bilinmiyor","Diğer"];
   $("kovan-islem-icerik").innerHTML = `
     <p style="font-size:14px;color:var(--gray);margin-bottom:16px">Bu kovan için ne yapmak istiyorsunuz?</p>
+    <div class="field" id="islem-neden-alani" style="display:none">
+      <label>Kayıp Nedeni</label>
+      <select class="input" id="islem-neden">
+        ${nedenler.map(n => `<option value="${n}">${n}</option>`).join("")}
+      </select>
+    </div>
     <div class="field"><label>Not (opsiyonel)</label>
-      <input class="input" id="islem-not" placeholder="Alıcı adı, sebep...">
+      <input class="input" id="islem-not" placeholder="Alıcı adı, ek detay...">
     </div>
     <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
       <button onclick="kovanIslemOnayla('${id}','satildi')"
         style="width:100%;padding:13px;background:var(--green2);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">
         💰 Satıldı
       </button>
-      <button onclick="kovanIslemOnayla('${id}','söndü')"
+      <button onclick="$('islem-neden-alani').style.display='block';kovanIslemOnayla('${id}','söndü')"
         style="width:100%;padding:13px;background:var(--red);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">
         💀 Söndü
       </button>
@@ -3048,10 +3087,13 @@ window.kovanIslemModal = function(id) {
 window.kovanIslemOnayla = function(id, durum) {
   const hive = hives.find(h => h.id === id);
   if (!hive) return;
+  // "Söndü" ilk tıklamada sadece neden alanını açar — ikinci tıklamada (neden alanı açıkken) onaya geçer
+  if (durum === "söndü" && $("islem-neden-alani")?.style.display === "none") return;
   const not = $("islem-not")?.value?.trim() || "";
+  const neden = durum === "söndü" ? ($("islem-neden")?.value || "Bilinmiyor") : "";
   const mesajlar = {
     satildi: `${hive.name}. Kovan satıldı olarak işaretlenecek ve geçmişe taşınacak.`,
-    "söndü": `${hive.name}. Kovan söndü olarak işaretlenecek ve geçmişe taşınacak.`,
+    "söndü": `${hive.name}. Kovan söndü olarak işaretlenecek (${neden}) ve geçmişe taşınacak.`,
     silindi: `${hive.name}. Kovan silinecek ve geçmişe taşınacak (numara serbest kalır).`,
   };
   if (!confirm(`⚠️ ONAY
@@ -3060,7 +3102,7 @@ ${mesajlar[durum]}
 
 Devam etmek istiyor musunuz?`)) return;
   closeModal("modal-kovan-islem");
-  deleteHive(id, durum, not);
+  window.deleteHive(id, durum, not, neden);
 };
 
 // ─── GRUP YÖNETİMİ ──────────────────────────────────────────────
@@ -3349,7 +3391,7 @@ function renderAnaliz() {
   el.innerHTML = html;
 
   // İlk grubu seç
-  analizFiltreSec(gruplamalar[0].id);
+  window.analizFiltreSec(gruplamalar[0].id);
 
   window._analizGruplamalar = gruplamalar;
   window._analizGruplariRender = gruplariRender;
@@ -4012,7 +4054,7 @@ let krokiSeciliHiveId = null;
 
 window.selectHiveFromKroki = function(id) {
   if (activeTab === "kroki") {
-    if (krokiSeciliHiveId) { krokiSecimKaldir(); return; }
+    if (krokiSeciliHiveId) { window.krokiSecimKaldir(); return; }
   }
   kovanDetayAc(id);
 };
@@ -4426,7 +4468,7 @@ window.kovanTasi = async function(rowDelta, colDelta) {
 
 async function kovanTasiKaydet() {
   const yeniPoz = pendingPos[krokiSeciliHiveId];
-  if (!yeniPoz) { krokiSecimKaldir(); return; }
+  if (!yeniPoz) { window.krokiSecimKaldir(); return; }
 
   // Hedef dolu mu?
   const hedef = hives.find(h =>
@@ -4606,7 +4648,7 @@ window.queenSecimKaldir = function() {
 
 window.queenTasiKaydet = async function() {
   const yeniPoz = queenPendingPos[queenSeciliHiveId];
-  if (!yeniPoz) { queenSecimKaldir(); return; }
+  if (!yeniPoz) { window.queenSecimKaldir(); return; }
   await updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${queenSeciliHiveId}`), { qpos: yeniPoz, pos: null });
   showToast("✓ Kraliçe kutusu konumu güncellendi");
   queenPendingPos = {}; queenOriginalPos = {};
