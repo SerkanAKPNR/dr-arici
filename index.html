@@ -1457,11 +1457,13 @@ window.deleteHive = async function(id, durum, not, neden) {
   const hive = hives.find(h => h.id === id);
   if (!hive) return;
   const num = parseInt(hive.name);
+  const { id: orijinalId, ...hiveVeri } = hive; // id'yi çıkar — geçmiş kaydının kendi Firestore id'siyle çakışmasın
 
   // Hepsi geçmişe taşınır (silindi'de numara otomatik serbest kalır, satıldı/söndü'de yasaklanır)
   if (durum !== "silindi" && num > 0) addBannedNumber(num);
   await addDoc(col("kovan_gecmis"), {
-    ...hive,
+    ...hiveVeri,
+    orijinalId,
     arsivDurum: durum,
     arsivNot: not || "",
     arsivNeden: neden || "",
@@ -2969,7 +2971,7 @@ let kovanGecmis = [];
 function loadKovanGecmis() {
   if (_unsubGecmis) _unsubGecmis();
   _unsubGecmis = onSnapshot(query(col("kovan_gecmis"), orderBy("arsivAt", "desc")), snap => {
-    kovanGecmis = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    kovanGecmis = snap.docs.map(d => ({ ...d.data(), id: d.id })); // id EN SONDA — veri içindeki eski/hatalı id alanı asla üzerine yazamasın
     renderGecmis();
   });
 }
@@ -3031,27 +3033,81 @@ function renderGecmis() {
       </div>
       ${k.arsivNeden ? `<div style="font-size:12px;color:var(--red);font-weight:600;margin-bottom:4px">⚠️ Neden: ${esc(k.arsivNeden)}</div>` : ''}
       ${detaylar.length ? `<div style="font-size:12px;color:var(--gray);margin-bottom:6px;display:flex;gap:10px;flex-wrap:wrap">${detaylar.join('&nbsp;&nbsp;')}</div>` : ''}
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
-        <div style="display:flex;gap:12px;font-size:12px;color:var(--gray)">
-          <span>📅 ${k.arsivTarih||'—'}</span>
-          ${k.arsivNot ? `<span>📝 ${esc(k.arsivNot)}</span>` : ''}
-        </div>
+      <div style="display:flex;gap:12px;font-size:12px;color:var(--gray);margin-bottom:8px">
+        <span>📅 ${k.arsivTarih||'—'}</span>
+        ${k.arsivNot ? `<span>📝 ${esc(k.arsivNot)}</span>` : ''}
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${k.arsivDurum === "söndü" ? `<button onclick="gecmisNedenDuzenle('${k.id}')"
+          style="font-size:11px;padding:4px 10px;border:1px solid var(--gray2);border-radius:20px;background:none;color:var(--brown2);cursor:pointer">
+          ✏️ Neden</button>` : ''}
         ${getBannedNumbers().includes(parseInt(k.name)) ?
           `<button onclick="numarayiSerbest('${k.name}')"
-            style="font-size:11px;padding:3px 10px;border:1px solid var(--amber);border-radius:20px;background:none;color:var(--amber);cursor:pointer;white-space:nowrap">
-            🔓 Numarayı Serbest Bırak
-          </button>` : ''
+            style="font-size:11px;padding:4px 10px;border:1px solid var(--amber);border-radius:20px;background:none;color:var(--amber);cursor:pointer">
+            🔓 Numarayı Serbest Bırak</button>` : ''
         }
+        <button onclick="gecmisKovanGeriYukle('${k.id}')"
+          style="font-size:11px;padding:4px 10px;border:1px solid var(--green2);border-radius:20px;background:none;color:var(--green2);cursor:pointer">
+          ↩️ Geri Yükle</button>
+        <button onclick="gecmisKovanKaliciSil('${k.id}')"
+          style="font-size:11px;padding:4px 10px;border:1px solid var(--red);border-radius:20px;background:none;color:var(--red);cursor:pointer">
+          🗑️ Kalıcı Sil</button>
       </div>
     </div>`;
   }).join("");
 }
 
+window.gecmisNedenDuzenle = async function(gecmisId) {
+  const k = kovanGecmis.find(x => x.id === gecmisId);
+  if (!k) return;
+  const secim = prompt(`Kayıp nedeni:\n${KAYIP_NEDENLERI.map((n,i)=>`${i+1}. ${n}`).join('\n')}\n\nNumara gir (1-${KAYIP_NEDENLERI.length}):`, "");
+  const idx = parseInt(secim) - 1;
+  if (isNaN(idx) || idx < 0 || idx >= KAYIP_NEDENLERI.length) return;
+  await updateDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovan_gecmis/${gecmisId}`), { arsivNeden: KAYIP_NEDENLERI[idx] });
+  k.arsivNeden = KAYIP_NEDENLERI[idx];
+  showToast("✓ Neden güncellendi");
+  renderGecmis();
+};
+
+window.gecmisKovanKaliciSil = async function(gecmisId) {
+  const k = kovanGecmis.find(x => x.id === gecmisId);
+  if (!k) return;
+  if (!confirm(`${k.name}. Kovan geçmiş kaydı KALICI olarak silinecek.\n\nBu işlem geri alınamaz. Emin misiniz?`)) return;
+  await deleteDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovan_gecmis/${gecmisId}`));
+  showToast("✓ Geçmiş kaydı silindi");
+};
+
+window.gecmisKovanGeriYukle = async function(gecmisId) {
+  const k = kovanGecmis.find(x => x.id === gecmisId);
+  if (!k) return;
+  if (hives.some(h => String(h.name) === String(k.name))) {
+    showToast(`⚠️ ${k.name} numarası zaten kullanımda — önce o kovanın numarasını değiştirin`);
+    return;
+  }
+  if (!confirm(`${k.name}. Kovan aktif kovanlara geri getirilsin mi?`)) return;
+  const { id, arsivDurum, arsivNot, arsivNeden, arsivTarih, arsivAt, ...veri } = k;
+  // Konum başka bir kovan tarafından alınmışsa boş bırak, kullanıcı kroki'den yerleştirsin
+  if (veri.pos && hives.some(h => h.pos && h.pos.row === veri.pos.row && h.pos.col === veri.pos.col)) {
+    delete veri.pos;
+  }
+  await setDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovanllar/${id}`), veri);
+  await deleteDoc(doc(db, `users/${activeIsletmeId||currentUser.uid}/kovan_gecmis/${gecmisId}`));
+  const num = parseInt(k.name);
+  if (num > 0) {
+    const list = getBannedNumbers().filter(n => n !== num);
+    localStorage.setItem("banned_hive_numbers", JSON.stringify(list));
+    await saveAyarlarToFirestore();
+  }
+  showToast(`✓ ${k.name}. Kovan geri getirildi${veri.pos ? '' : ' — krokiden yerleştirin'}`);
+};
+
+const KAYIP_NEDENLERI = ["Varroa","Açlık","Kraliçesizlik","Hastalık","Yağma","Soğuk/Kış kaybı","Zehirlenme","Bilinmiyor","Diğer"];
+
 window.kovanIslemModal = function(id) {
   const hive = hives.find(h => h.id === id);
   if (!hive) return;
   $("kovan-islem-baslik").textContent = `${hive.name}. Kovan — İşlem`;
-  const nedenler = ["Varroa","Açlık","Kraliçesizlik","Hastalık","Yağma","Soğuk/Kış kaybı","Zehirlenme","Bilinmiyor","Diğer"];
+  const nedenler = KAYIP_NEDENLERI;
   $("kovan-islem-icerik").innerHTML = `
     <p style="font-size:14px;color:var(--gray);margin-bottom:16px">Bu kovan için ne yapmak istiyorsunuz?</p>
     <div class="field" id="islem-neden-alani" style="display:none">
