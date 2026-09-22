@@ -487,6 +487,12 @@
         <div style="display:flex;gap:6px;margin-bottom:12px" id="yon-sutun-butonlari"></div>
       </div>
 
+      <div class="sec-title">Yasaklı Numaralar</div>
+      <div style="background:var(--white);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow)">
+        <div style="font-size:12px;color:var(--gray);margin-bottom:12px">Satılan/söndü olarak kapatılan kovanların numaraları. Serbest bırakırsan yeni kovana tekrar verilebilir.</div>
+        <div id="yasakli-numara-listesi"></div>
+      </div>
+
       <div class="sec-title">Yedekleme</div>
       <div style="background:var(--white);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow)">
         <div id="yedek-durum" style="font-size:13px;margin-bottom:12px;padding:8px 10px;border-radius:8px;text-align:center"></div>
@@ -2162,6 +2168,7 @@ function renderSettings() {
   const qcolsEl = $("set-qcols"); if (qcolsEl) qcolsEl.value = QCOLS;
   renderYonButonlari();
   renderYedekDurum();
+  renderYasakliNumaralar();
   // Butonları her seferinde yeniden bağla
   const btnCikis = $("btn-cikis-yap");
   if (btnCikis) btnCikis.onclick = () => {
@@ -3315,6 +3322,42 @@ function renderSiparisler() {
     background:${siparisFiltre===key?'var(--amber)':'var(--white)'};color:${siparisFiltre===key?'#fff':'var(--brown2)'};
     font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">${label}</button>`;
 
+  // Ürün bazında kırılım (mevcut filtreye göre): toplam miktar, ağırlıklı ortalama fiyat, ciro
+  const URUN_IKON = { "Bal":"🍯", "Polen":"🌼", "Propolis":"🟤", "Arı Sütü":"👑", "Balmumu":"🕯️", "Diğer":"📦" };
+  const gruplar = {};
+  liste.forEach(s => {
+    const key = `${s.urun}|${s.birim}`;
+    if (!gruplar[key]) gruplar[key] = { urun: s.urun, birim: s.birim, miktar: 0, tutar: 0, adet: 0 };
+    gruplar[key].miktar += (s.miktar || 0);
+    gruplar[key].tutar += (s.toplam || 0);
+    gruplar[key].adet += 1;
+  });
+  const gruplananListe = Object.values(gruplar).sort((a,b) => b.tutar - a.tutar);
+  const genelCiro = gruplananListe.reduce((s,g) => s + g.tutar, 0);
+
+  const ozetHtml = gruplananListe.length ? `
+    <div style="background:var(--white);border-radius:var(--radius);padding:14px;margin-bottom:14px;box-shadow:var(--shadow)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="font-size:13px;font-weight:700;color:var(--brown)">📊 Ürün Bazında Özet</div>
+        <div style="font-size:13px;font-weight:700;color:var(--green2)">₺${genelCiro.toLocaleString("tr-TR",{maximumFractionDigits:0})}</div>
+      </div>
+      ${gruplananListe.map(g => {
+        const ortalama = g.miktar > 0 ? g.tutar / g.miktar : 0;
+        return `
+        <div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--gray2)">
+          <span style="font-size:18px">${URUN_IKON[g.urun]||'📦'}</span>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:600;color:var(--brown2)">${esc(g.urun)}</div>
+            <div style="font-size:11px;color:var(--gray)">${g.adet} sipariş · Ort. ₺${ortalama.toLocaleString("tr-TR",{maximumFractionDigits:0})}/${esc(g.birim)}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:13px;font-weight:700;color:var(--brown)">${g.miktar.toLocaleString("tr-TR",{maximumFractionDigits:1})} ${esc(g.birim)}</div>
+            <div style="font-size:11px;color:var(--gray)">₺${g.tutar.toLocaleString("tr-TR",{maximumFractionDigits:0})}</div>
+          </div>
+        </div>`;
+      }).join("")}
+    </div>` : '';
+
   el.innerHTML = `
     <div style="display:flex;gap:8px;margin-bottom:14px">
       <div style="flex:1;background:${bekleyenSayisi>0?'linear-gradient(135deg,var(--brown),var(--amber))':'var(--white)'};
@@ -3333,6 +3376,8 @@ function renderSiparisler() {
       ${filtreBtn("tamamlanan","Tamamlanan")}
       ${filtreBtn("hepsi","Hepsi")}
     </div>
+
+    ${ozetHtml}
 
     ${!liste.length ? `<div class="empty"><div class="empty-icon">📦</div><div class="empty-text">${siparisFiltre==='aktif'?'Bekleyen sipariş yok':'Kayıt yok'}</div></div>` :
       liste.map(s => {
@@ -5190,8 +5235,49 @@ async function numarayiSerbest(name) {
   await saveAyarlarToFirestore();
   showToast(`✓ ${num} numarası serbest bırakıldı`);
   renderGecmis();
+  renderYasakliNumaralar();
 }
 window.numarayiSerbest = numarayiSerbest;
+
+function renderYasakliNumaralar() {
+  const el = $("yasakli-numara-listesi");
+  if (!el) return;
+  const list = getBannedNumbers().sort((a,b) => a-b);
+  if (!list.length) {
+    el.innerHTML = `<div style="font-size:13px;color:var(--gray);text-align:center;padding:8px 0">Yasaklı numara yok</div>`;
+    return;
+  }
+  el.innerHTML = `
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+      ${list.map(n => {
+        const gecmisKayit = kovanGecmis.find(k => parseInt(k.name) === n);
+        return `
+        <div style="display:flex;align-items:center;gap:6px;background:var(--cream2);border-radius:20px;padding:4px 6px 4px 12px">
+          <span style="font-size:13px;font-weight:700;color:var(--brown)">${n}</span>
+          ${gecmisKayit ? `<span style="font-size:10px;color:var(--gray)">(${gecmisKayit.arsivDurum==='satildi'?'satıldı':gecmisKayit.arsivDurum==='söndü'?'söndü':gecmisKayit.arsivDurum})</span>` : ''}
+          <button onclick="numarayiSerbest('${n}')"
+            style="background:none;border:none;color:var(--amber);cursor:pointer;font-size:14px;padding:2px 6px">🔓</button>
+        </div>`;
+      }).join("")}
+    </div>
+    <button onclick="tumYasakliNumaralariSerbestBirak()"
+      style="width:100%;padding:9px;border:1.5px solid var(--red);border-radius:8px;background:none;color:var(--red);font-weight:600;font-size:13px;cursor:pointer;font-family:inherit">
+      🔓 Hepsini Serbest Bırak (${list.length})
+    </button>`;
+}
+window.renderYasakliNumaralar = renderYasakliNumaralar;
+
+async function tumYasakliNumaralariSerbestBirak() {
+  const list = getBannedNumbers();
+  if (!list.length) return;
+  if (!confirm(`${list.length} numara (${list.sort((a,b)=>a-b).join(", ")}) serbest bırakılsın mı?\nHepsi yeni kovanlara tekrar verilebilir hale gelecek.`)) return;
+  localStorage.setItem("banned_hive_numbers", "[]");
+  await saveAyarlarToFirestore();
+  showToast(`✓ ${list.length} numara serbest bırakıldı`);
+  renderGecmis();
+  renderYasakliNumaralar();
+}
+window.tumYasakliNumaralariSerbestBirak = tumYasakliNumaralariSerbestBirak;
 window.notEkleAc = notEkleAc;
 
 window.kalipSec = function(id) {
